@@ -1,4 +1,5 @@
 import { defineStore } from 'pinia'
+import { useAuthStore } from './auth'
 
 export const useTransactionStore = defineStore('transactions', {
   state: () => ({
@@ -8,10 +9,11 @@ export const useTransactionStore = defineStore('transactions', {
   }),
   actions: {
     async fetchTransactions() {
+      const config = useRuntimeConfig()
       this.loading = true
       try {
         // Backend'deki listeyi çekiyoruz
-        const data = await $fetch('http://localhost:3000/transactions')
+        const data = await $fetch(`${config.public.apiBase}/transactions`)
         this.transactions = data as any[]
       } catch (error) {
         console.error('Hata:', error)
@@ -20,20 +22,27 @@ export const useTransactionStore = defineStore('transactions', {
       }
     },
     async completeTransaction(id: string) {
+      const config = useRuntimeConfig()
+      const auth = useAuthStore()
       try {
-        await $fetch(`http://localhost:3000/transactions/${id}/status`, {
+        await $fetch(`${config.public.apiBase}/transactions/${id}/status`, {
           method: 'PATCH',
+          headers: {
+            Authorization: `Bearer ${auth.token}`
+          },
           body: { status: 'completed' }
         })
         // Güncel halini tekrar çek
         await this.fetchTransactions()
       } catch (error) {
+        console.error('Hata:', error)
         alert('İşlem güncellenemedi!')
       }
     },
     async createTransaction(payload: any) {
+      const config = useRuntimeConfig()
       try {
-        await $fetch('http://localhost:3000/transactions', {
+        await $fetch(`${config.public.apiBase}/transactions`, {
           method: 'POST',
           body: payload
         })
@@ -43,9 +52,14 @@ export const useTransactionStore = defineStore('transactions', {
       }
     },
     async updateTransaction(id: string, payload: any) {
+      const config = useRuntimeConfig()
+      const auth = useAuthStore()
       try {
-        await $fetch(`http://localhost:3000/transactions/${id}/status`, {
+        await $fetch(`${config.public.apiBase}/transactions/${id}/status`, {
           method: 'PATCH',
+          headers: {
+            Authorization: `Bearer ${auth.token}`
+          },
           body: payload
         })
         await this.fetchTransactions()

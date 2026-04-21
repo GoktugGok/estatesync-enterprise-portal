@@ -11,7 +11,8 @@ export const useAuthStore = defineStore('auth', {
   },
   actions: {
     async login(email: string, password: string) {
-      const data: any = await $fetch('http://localhost:3000/auth/login', {
+      const config = useRuntimeConfig()
+      const data: any = await $fetch(`${config.public.apiBase}/auth/login`, {
         method: 'POST',
         body: { email, password },
       })
@@ -23,7 +24,8 @@ export const useAuthStore = defineStore('auth', {
       }
     },
     async register(name: string, email: string, password: string) {
-      const data: any = await $fetch('http://localhost:3000/auth/register', {
+      const config = useRuntimeConfig()
+      const data: any = await $fetch(`${config.public.apiBase}/auth/register`, {
         method: 'POST',
         body: { name, email, password, role: 'agent' },
       })

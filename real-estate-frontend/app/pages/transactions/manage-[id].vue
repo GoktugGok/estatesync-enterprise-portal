@@ -57,7 +57,8 @@ onMounted(async () => {
     selectedSellingAgent.value = typeof t.sellingAgentId === 'object' ? t.sellingAgentId?._id : (t.sellingAgentId || '')
 
     // Fetch agents for the dropdown
-    const data = await $fetch('http://localhost:3000/users')
+    const config = useRuntimeConfig()
+    const data = await $fetch(`${config.public.apiBase}/users`)
     if (data && Array.isArray(data)) {
       agents.value = data
     }

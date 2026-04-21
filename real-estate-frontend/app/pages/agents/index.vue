@@ -25,7 +25,8 @@ const transStore = useTransactionStore()
 
 onMounted(async () => {
   try {
-    const data = await $fetch('http://localhost:3000/users')
+    const config = useRuntimeConfig()
+    const data = await $fetch(`${config.public.apiBase}/users`)
     if (data && Array.isArray(data)) {
       users.value = data.filter(u => u.role === 'agent')
     }
@@ -122,7 +123,8 @@ const handleAdd = async () => {
   }
   try {
     addLoading.value = true
-    const created = await $fetch('http://localhost:3000/users', {
+    const config = useRuntimeConfig()
+    const created = await $fetch(`${config.public.apiBase}/users`, {
       method: 'POST',
       body: { ...newAgent.value, role: 'agent' }
     })

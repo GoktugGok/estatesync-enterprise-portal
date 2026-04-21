@@ -29,7 +29,8 @@ const agents = ref([])
 
 const fetchAgents = async () => {
   try {
-    const data = await $fetch('http://localhost:3000/users')
+    const config = useRuntimeConfig()
+    const data = await $fetch(`${config.public.apiBase}/users`)
     if(data && Array.isArray(data) && data.length > 0) {
       agents.value = data
     }

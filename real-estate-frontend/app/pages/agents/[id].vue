@@ -33,7 +33,8 @@ const onPhotoChange = (e) => {
 
 onMounted(async () => {
   try {
-    const users = await $fetch('http://localhost:3000/users')
+    const config = useRuntimeConfig()
+    const users = await $fetch(`${config.public.apiBase}/users`)
     const found = users.find(u => u._id === agentId)
     if (found) {
       agent.value = found
@@ -187,7 +188,8 @@ const saveEdit = async () => {
       photoUrl = photoPreview.value
     }
     const payload = { ...editData.value, photo: photoUrl }
-    const updated = await $fetch(`http://localhost:3000/users/${agentId}`, {
+    const config = useRuntimeConfig()
+    const updated = await $fetch(`${config.public.apiBase}/users/${agentId}`, {
       method: 'PATCH',
       body: payload
     })
