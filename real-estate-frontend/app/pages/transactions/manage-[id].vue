@@ -38,8 +38,11 @@ const toggleDropdown = (e) => {
 const closeDropdown = () => {
   isDropdownOpen.value = false
 }
+ 
+const showConfirmModal = ref(false)
 
 const agents = ref([])
+const selectableAgents = computed(() => agents.value.filter(a => a.role !== 'admin'))
 
 // Stages definition
 const stages = [
@@ -194,8 +197,11 @@ const saveChanges = async () => {
 }
 
 const cancelTransaction = async () => {
-  if (!confirm('Are you sure you want to cancel this transaction? This action is permanent.')) return
-  
+  showConfirmModal.value = true
+}
+
+const confirmCancel = async () => {
+  showConfirmModal.value = false
   loading.value = true
   try {
     await store.updateTransaction(transactionId, { status: 'canceled' })
@@ -247,7 +253,7 @@ const VALID_TRANSITIONS = {
   <div v-else class="max-w-[1100px] mx-auto py-8 text-[#0B1A40]">
     
     <!-- Top Stepper Component -->
-    <div class="mb-12 border-b border-slate-100 pb-8 flex items-center justify-between relative px-10">
+    <div class="mb-12 border-b border-slate-100 pb-8 flex items-start justify-between relative px-10">
        <div class="absolute inset-0 top-[20px] left-[10%] right-[10%] h-0.5 bg-slate-100 -z-10"></div>
        <div class="absolute inset-0 top-[20px] left-[10%] h-0.5 bg-[#5B4EFF] -z-10 transition-all duration-300" :style="{ width: ((stageOrder.indexOf(selectedStage) / (stageOrder.length - 1)) * 80) + '%' }"></div>
        
@@ -344,7 +350,7 @@ const VALID_TRANSITIONS = {
                        <span class="text-[13px] font-medium text-slate-400 italic">Clear (Remove)</span>
                     </div>
                     <div class="max-h-[220px] overflow-y-auto custom-scroll">
-                      <div v-for="agent in agents" :key="agent._id" @click.stop="selectedSellingAgent = agent._id; isDropdownOpen = false" class="px-5 py-3 hover:bg-indigo-50/50 cursor-pointer flex items-center justify-between text-[#0B1A40] transition-colors border-b border-slate-50 last:border-0">
+                      <div v-for="agent in selectableAgents" :key="agent._id" @click.stop="selectedSellingAgent = agent._id; isDropdownOpen = false" class="px-5 py-3 hover:bg-indigo-50/50 cursor-pointer flex items-center justify-between text-[#0B1A40] transition-colors border-b border-slate-50 last:border-0">
                          <span :class="['text-[13px]', selectedSellingAgent === agent._id ? 'font-black text-[#5B4EFF]' : 'font-medium']">{{ agent.name }}</span>
                          <svg v-if="selectedSellingAgent === agent._id" class="w-4 h-4 text-[#5B4EFF]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" /></svg>
                       </div>
@@ -396,42 +402,42 @@ const VALID_TRANSITIONS = {
 
              <!-- Breakdown Rows -->
              <div class="space-y-3 relative z-10">
-                <div class="flex justify-between items-center text-[13px]">
-                  <div class="flex items-center gap-2 font-medium text-slate-600">
-                    <div class="w-2.5 h-2.5 rounded-full bg-[#5B4EFF]"></div>
-                    Brokerage (50%)
-                  </div>
-                  <div class="font-black text-[#0B1A40]">${{ financialSplit.brokerage.toLocaleString('en-US') }}</div>
-                </div>
+                 <div class="flex justify-between items-center gap-4 text-[13px]">
+                   <div class="flex items-center gap-2 font-medium text-slate-600 shrink-0">
+                     <div class="w-2.5 h-2.5 rounded-full bg-[#5B4EFF]"></div>
+                     <span class="whitespace-nowrap">Brokerage (50%)</span>
+                   </div>
+                   <div class="font-black text-[#0B1A40] whitespace-nowrap">${{ financialSplit.brokerage.toLocaleString('en-US') }}</div>
+                 </div>
                 
                 <!-- Agent Distribution Pool -->
                 <template v-if="isSameAgentLocal">
-                  <div class="flex justify-between items-center text-[13px]">
-                    <div class="flex items-center gap-2 font-medium text-slate-600">
-                      <div class="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-sm shadow-emerald-200"></div>
-                      Listing & Selling Agent (50%)
-                    </div>
-                    <div class="font-black text-[#0B1A40]">${{ financialSplit.list.toLocaleString('en-US') }}</div>
-                  </div>
+                   <div class="flex justify-between items-center gap-4 text-[13px]">
+                     <div class="flex items-center gap-2 font-medium text-slate-600 shrink-0">
+                       <div class="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-sm shadow-emerald-200"></div>
+                       <span class="whitespace-nowrap">Listing & Selling Agent (50%)</span>
+                     </div>
+                     <div class="font-black text-[#0B1A40] whitespace-nowrap">${{ financialSplit.list.toLocaleString('en-US') }}</div>
+                   </div>
                 </template>
                 <template v-else>
                   <!-- Listing Agent -->
-                  <div class="flex justify-between items-center text-[13px]">
-                    <div class="flex items-center gap-2 font-medium text-slate-600">
-                      <div class="w-2.5 h-2.5 rounded-full bg-emerald-500"></div>
-                      Listing Agent ({{ !selectedSellingAgent ? '50%' : '25%' }})
-                    </div>
-                    <div class="font-black text-[#0B1A40]">${{ financialSplit.list.toLocaleString('en-US') }}</div>
-                  </div>
+                   <div class="flex justify-between items-center gap-4 text-[13px]">
+                     <div class="flex items-center gap-2 font-medium text-slate-600 shrink-0">
+                       <div class="w-2.5 h-2.5 rounded-full bg-emerald-500"></div>
+                       <span class="whitespace-nowrap">Listing Agent ({{ !selectedSellingAgent ? '50%' : '25%' }})</span>
+                     </div>
+                     <div class="font-black text-[#0B1A40] whitespace-nowrap">${{ financialSplit.list.toLocaleString('en-US') }}</div>
+                   </div>
 
                   <!-- Selling Agent (Show only if not same agent, unassigned or different) -->
-                  <div :class="['flex justify-between items-center text-[13px] pt-3 mt-3 border-t border-slate-100', (!selectedSellingAgent) ? 'opacity-50 grayscale pointer-events-none' : '']">
-                    <div class="flex items-center gap-2 font-medium text-slate-600">
-                      <div class="w-2.5 h-2.5 rounded-full bg-slate-300"></div>
-                      <span class="truncate max-w-[150px]">Selling Agent {{ !selectedSellingAgent ? '(Unassigned)' : '(25%)' }}</span>
-                    </div>
-                    <div class="font-black text-[#0B1A40]">${{ financialSplit.sell.toLocaleString('en-US') }}</div>
-                  </div>
+                   <div :class="['flex justify-between items-center gap-4 text-[13px] pt-3 mt-3 border-t border-slate-100', (!selectedSellingAgent) ? 'opacity-50 grayscale pointer-events-none' : '']">
+                     <div class="flex items-center gap-2 font-medium text-slate-600 shrink-0">
+                       <div class="w-2.5 h-2.5 rounded-full bg-slate-300"></div>
+                       <span class="whitespace-nowrap">Selling Agent ({{ !selectedSellingAgent ? '0%' : '25%' }})</span>
+                     </div>
+                     <div class="font-black text-[#0B1A40] whitespace-nowrap">${{ financialSplit.sell.toLocaleString('en-US') }}</div>
+                   </div>
                 </template>
              </div>
           </div>
@@ -462,4 +468,31 @@ const VALID_TRANSITIONS = {
 
     </div>
   </div>
+
+  <!-- Custom Confirmation Modal (Teleport to body for top-level layering) -->
+  <Teleport to="body">
+    <div v-if="showConfirmModal" class="fixed inset-0 z-[100] flex items-center justify-center p-4">
+        <!-- Glass Backdrop -->
+        <div class="absolute inset-0 bg-slate-900/40 backdrop-blur-sm transition-opacity" @click="showConfirmModal = false"></div>
+        
+        <!-- Modal Card -->
+        <div class="relative bg-white rounded-[32px] p-8 sm:p-10 max-w-md w-full shadow-[0_20px_50px_rgba(0,0,0,0.2)] animate-in zoom-in-95 fade-in duration-200">
+            <div class="w-20 h-20 bg-red-50 rounded-full flex items-center justify-center mb-6 mx-auto">
+                <svg class="w-10 h-10 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+            </div>
+            <h3 class="text-[26px] font-black text-center text-[#0B1A40] mb-3 tracking-tight">Cancel Transaction?</h3>
+            <p class="text-center text-slate-500 font-medium text-[15px] mb-10 leading-relaxed">
+              Are you sure you want to cancel <span class="font-bold text-slate-700">TRX-{{ (transactionId || '').slice(-5).toUpperCase() }}</span>? This action is permanent and cannot be undone.
+            </p>
+            <div class="flex flex-col sm:flex-row gap-3">
+                <button @click="showConfirmModal = false" class="flex-1 px-6 py-4 rounded-2xl border border-slate-200 font-bold text-slate-500 text-[14px] hover:bg-slate-50 transition-colors order-2 sm:order-1">
+                  Keep Active
+                </button>
+                <button @click="confirmCancel" class="flex-1 px-6 py-4 rounded-2xl bg-red-500 text-white font-black text-[14px] hover:bg-red-600 shadow-lg shadow-red-200 transition-all active:scale-[0.98] order-1 sm:order-2">
+                  Yes, Cancel
+                </button>
+            </div>
+        </div>
+    </div>
+  </Teleport>
 </template>

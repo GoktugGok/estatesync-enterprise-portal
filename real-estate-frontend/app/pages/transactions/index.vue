@@ -312,7 +312,7 @@ watch([searchQuery, statusFilter], () => {
           <svg class="w-5 h-5 text-slate-400 group-hover:text-[#5B4EFF] transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"></path></svg>
         </button>
 
-        <div class="px-5 py-8 sm:p-10 relative">
+        <div class="pl-2 pr-5 py-8 sm:pl-6 sm:pr-10 sm:py-10 relative">
           <!-- Breadcrumbs -->
           <div class="text-[9px] sm:text-[11px] font-bold text-slate-400 mb-4 sm:mb-6 flex flex-wrap items-center gap-2 tracking-widest uppercase relative z-10 w-full pr-12 sm:pr-20">
             <span class="cursor-pointer hover:text-slate-600 border border-slate-200 border-dashed px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-md" @click="store.closeDetail()">Transactions</span>
@@ -360,10 +360,10 @@ watch([searchQuery, statusFilter], () => {
           </div>
 
           <!-- Layout below banner -->
-          <div class="flex flex-col lg:flex-row gap-6 w-full items-start">
+          <div class="flex flex-col lg:flex-row gap-6 w-full">
             <!-- Left Col (Splits) -->
             <div class="contents lg:block lg:flex-1 lg:min-w-[500px]">
-              <div :class="['bg-white rounded-3xl p-5 sm:p-8 border border-slate-100 shadow-[0_4px_24px_rgba(0,0,0,0.02)] transition-all order-2 lg:order-none', store.selectedTransaction.status === 'canceled' ? 'grayscale opacity-60' : '']">
+              <div :class="['w-full bg-white rounded-3xl p-5 sm:p-8 border border-slate-100 shadow-[0_4px_24px_rgba(0,0,0,0.02)] transition-all order-2 lg:order-none', store.selectedTransaction.status === 'canceled' ? 'grayscale opacity-60' : '']">
                 <!-- Title -->
                 <div class="flex items-center gap-3 mb-5 sm:mb-8">
                   <div class="w-[20px] h-[20px] sm:w-[26px] sm:h-[26px] rounded-full bg-[#5B4EFF] flex items-center justify-center shrink-0">
@@ -374,16 +374,16 @@ watch([searchQuery, statusFilter], () => {
                 </div>
 
                 <!-- Brokerage Split -->
-                <div class="flex items-center justify-between bg-slate-50 rounded-[20px] p-4 sm:p-6 mb-6 sm:mb-8 border border-slate-100">
-                   <div class="flex items-center gap-3 sm:gap-4">
+                <div class="flex items-center justify-between gap-4 bg-slate-50 rounded-[20px] p-4 sm:p-6 mb-6 sm:mb-8 border border-slate-100">
+                   <div class="flex items-center gap-3 sm:gap-4 shrink-0">
                      <span class="bg-indigo-100/60 text-indigo-600 text-[10px] sm:text-[12px] font-black px-2 sm:px-3.5 py-1 sm:py-1.5 rounded-lg border border-indigo-200/50">50%</span>
                      <div>
-                       <div class="text-[13px] sm:text-[15px] font-black text-[#0B1A40]">Brokerage Share</div>
+                       <div class="text-[13px] sm:text-[15px] font-black text-[#0B1A40] whitespace-nowrap">Brokerage Share</div>
                        <div class="text-[10px] sm:text-[12px] font-medium text-slate-500">EstateSync Split</div>
                      </div>
                    </div>
-                   <div class="text-right">
-                     <div class="text-[14px] sm:text-[18px] font-black text-[#0B1A40]">${{ ((store.selectedTransaction.totalServiceFee || 0) * 0.5).toLocaleString('en-US') }}<span class="text-[10px] sm:text-[12px] text-slate-400">.00</span></div>
+                   <div class="text-right shrink-0">
+                     <div class="text-[14px] sm:text-[18px] font-black text-[#0B1A40] whitespace-nowrap">${{ ((store.selectedTransaction.totalServiceFee || 0) * 0.5).toLocaleString('en-US') }}<span class="text-[10px] sm:text-[12px] text-slate-400">.00</span></div>
                      <div class="text-[9px] sm:text-[11px] font-bold text-slate-400">Retained</div>
                    </div>
                 </div>
@@ -417,22 +417,22 @@ watch([searchQuery, statusFilter], () => {
                     </div>
 
                     <!-- Unassigned Ghost Row -->
-                    <div v-if="!hasSellingAgent" class="flex items-center justify-between p-5 border border-slate-100/50 rounded-[20px] shadow-none bg-slate-50/50 opacity-70">
-                      <div class="flex items-center gap-4">
-                         <div class="w-[46px] h-[46px] rounded-[14px] overflow-hidden bg-slate-200 shrink-0 flex items-center justify-center">
-                           <svg class="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
+                    <div v-if="!hasSellingAgent" class="flex items-center justify-between p-4 sm:p-5 border border-slate-100/50 rounded-[20px] shadow-none bg-slate-50/50 opacity-70">
+                      <div class="flex items-center gap-3 sm:gap-4">
+                         <div class="w-[36px] h-[36px] sm:w-[46px] sm:h-[46px] rounded-[10px] sm:rounded-[14px] overflow-hidden bg-slate-200 shrink-0 flex items-center justify-center">
+                           <svg class="w-4 h-4 sm:w-5 sm:h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
                          </div>
                          <div>
-                           <div class="flex items-center gap-2.5 mb-1">
-                             <div class="text-[15px] font-black text-slate-500">Pending Assignment</div>
-                             <span class="bg-slate-100 text-slate-500 text-[9px] font-black px-2 py-0.5 rounded uppercase tracking-wider">Unassigned</span>
+                           <div class="flex items-center gap-2.5 mb-0.5 sm:mb-1">
+                             <div class="text-[13px] sm:text-[15px] font-black text-slate-500">Pending Assignment</div>
+                             <span class="bg-slate-100 text-slate-500 text-[8px] sm:text-[9px] font-black px-1.5 py-0.5 rounded uppercase tracking-wider">Unassigned</span>
                            </div>
-                           <div class="text-[12px] font-medium text-slate-400">Selling Agent</div>
+                           <div class="text-[10px] sm:text-[12px] font-medium text-slate-400">Selling Agent</div>
                          </div>
                       </div>
                       <div class="text-right">
-                        <div class="text-[18px] font-black text-slate-400 mb-0.5">$0<span class="text-[12px] text-slate-400">.00</span></div>
-                        <div class="text-[11px] font-bold text-slate-400 flex items-center justify-end gap-1 px-2 py-0.5">Pending</div>
+                        <div class="text-[14px] sm:text-[18px] font-black text-slate-400 mb-0.5">$0<span class="text-[10px] sm:text-[12px] text-slate-400">.00</span></div>
+                        <div class="text-[9px] sm:text-[11px] font-bold text-slate-400 flex items-center justify-end gap-1 px-2 py-0.5">Pending</div>
                       </div>
                     </div>
                   </div>
@@ -440,48 +440,48 @@ watch([searchQuery, statusFilter], () => {
                   <!-- IF DIFFERENT AGENTS: 2 rows of 50% distribution -->
                   <template v-else>
                     <!-- Listing Agent -->
-                    <div :class="['flex items-center justify-between p-5 border border-slate-100 rounded-[20px] shadow-[0_2px_10px_rgba(0,0,0,0.01)] transition-all', store.selectedTransaction.status === 'canceled' ? 'opacity-50 grayscale bg-slate-50' : 'hover:border-indigo-100 hover:shadow-md']">
-                      <div class="flex items-center gap-4">
-                         <div class="w-[46px] h-[46px] rounded-[14px] overflow-hidden bg-indigo-500 border border-indigo-100 shrink-0 flex items-center justify-center text-white text-[14px] font-black">
+                    <div :class="['flex items-center justify-between p-4 sm:p-5 border border-slate-100 rounded-[20px] shadow-[0_2px_10px_rgba(0,0,0,0.01)] transition-all', store.selectedTransaction.status === 'canceled' ? 'opacity-50 grayscale bg-slate-50' : 'hover:border-indigo-100 hover:shadow-md']">
+                      <div class="flex items-center gap-3 sm:gap-4">
+                         <div class="w-[36px] h-[36px] sm:w-[46px] sm:h-[46px] rounded-[10px] sm:rounded-[14px] overflow-hidden bg-indigo-500 border border-indigo-100 shrink-0 flex items-center justify-center text-white text-[12px] sm:text-[14px] font-black">
                            <img v-if="getAgentPhoto(store.selectedTransaction.listingAgentId)" :src="getAgentPhoto(store.selectedTransaction.listingAgentId)" class="w-full h-full object-cover" />
                            <span v-else>{{ getInitials(getAgentName(store.selectedTransaction.listingAgentId)) }}</span>
                          </div>
                          <div>
-                           <div class="flex items-center gap-2.5 mb-1">
-                             <div class="text-[15px] font-black text-[#0B1A40]">{{ getAgentName(store.selectedTransaction.listingAgentId) }}</div>
-                             <span class="bg-indigo-50 text-indigo-500 text-[9px] font-black px-2 py-0.5 rounded-md uppercase tracking-wider">Listing</span>
+                           <div class="flex flex-col sm:flex-row sm:items-center gap-0.5 sm:gap-2.5 mb-0.5 sm:mb-1">
+                             <div class="text-[13px] sm:text-[15px] font-black text-[#0B1A40]">{{ getAgentName(store.selectedTransaction.listingAgentId) }}</div>
+                             <span class="bg-indigo-50 text-indigo-500 text-[8px] sm:text-[9px] font-black px-1.5 py-0.5 rounded uppercase tracking-wider w-fit">Listing</span>
                            </div>
-                           <div class="text-[12px] font-medium text-slate-500">50% of Agent Pool</div>
+                           <div class="text-[10px] sm:text-[12px] font-medium text-slate-500">50% of Agent Pool</div>
                          </div>
                       </div>
                       <div class="text-right">
-                        <div class="text-[18px] font-black text-[#0B1A40] mb-0.5">${{ ((store.selectedTransaction.totalServiceFee || 0) * 0.25).toLocaleString('en-US') }}<span class="text-[12px] text-slate-400">.00</span></div>
-                        <div v-if="store.selectedTransaction.status === 'completed'" class="text-[11px] font-bold text-emerald-500 flex items-center justify-end gap-1 px-2 py-0.5"><svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" /></svg> Paid</div>
-                        <div v-else-if="store.selectedTransaction.status === 'canceled'" class="text-[11px] font-bold text-slate-400 flex items-center justify-end gap-1 px-2 py-0.5"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12" /></svg></div>
-                        <div v-else class="text-[11px] font-bold text-amber-500 flex items-center justify-end gap-1 px-2 py-0.5"><svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg> In Progress</div>
+                        <div class="text-[14px] sm:text-[18px] font-black text-[#0B1A40] mb-0.5">${{ ((store.selectedTransaction.totalServiceFee || 0) * 0.25).toLocaleString('en-US') }}<span class="text-[10px] sm:text-[12px] text-slate-400">.00</span></div>
+                        <div v-if="store.selectedTransaction.status === 'completed'" class="text-[9px] sm:text-[11px] font-bold text-emerald-500 flex items-center justify-end gap-1 px-1 sm:px-2 py-0.5"><svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" /></svg> Paid</div>
+                        <div v-else-if="store.selectedTransaction.status === 'canceled'" class="text-[9px] sm:text-[11px] font-bold text-slate-400 flex items-center justify-end gap-1 px-1 sm:px-2 py-0.5"><svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12" /></svg></div>
+                        <div v-else class="text-[9px] sm:text-[11px] font-bold text-amber-500 flex items-center justify-end gap-1 px-1 sm:px-2 py-0.5"><svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg> In Progress</div>
                       </div>
                     </div>
                     
                     <!-- Selling Agent -->
-                    <div :class="['flex items-center justify-between p-5 border border-slate-100 rounded-[20px] shadow-[0_2px_10px_rgba(0,0,0,0.01)] transition-all', store.selectedTransaction.status === 'canceled' ? 'opacity-50 grayscale bg-slate-50' : 'hover:border-indigo-100 hover:shadow-md']">
-                      <div class="flex items-center gap-4">
-                         <div class="w-[46px] h-[46px] rounded-[14px] overflow-hidden bg-indigo-500 border border-indigo-100 shrink-0 flex items-center justify-center text-white text-[14px] font-black">
+                    <div :class="['flex items-center justify-between p-4 sm:p-5 border border-slate-100 rounded-[20px] shadow-[0_2px_10px_rgba(0,0,0,0.01)] transition-all', store.selectedTransaction.status === 'canceled' ? 'opacity-50 grayscale bg-slate-50' : 'hover:border-indigo-100 hover:shadow-md']">
+                      <div class="flex items-center gap-3 sm:gap-4">
+                         <div class="w-[36px] h-[36px] sm:w-[46px] sm:h-[46px] rounded-[10px] sm:rounded-[14px] overflow-hidden bg-indigo-500 border border-indigo-100 shrink-0 flex items-center justify-center text-white text-[12px] sm:text-[14px] font-black">
                            <img v-if="getAgentPhoto(store.selectedTransaction.sellingAgentId)" :src="getAgentPhoto(store.selectedTransaction.sellingAgentId)" class="w-full h-full object-cover" />
                            <span v-else>{{ getInitials(getAgentName(store.selectedTransaction.sellingAgentId)) }}</span>
                          </div>
                          <div>
-                           <div class="flex items-center gap-2.5 mb-1">
-                             <div class="text-[15px] font-black text-[#0B1A40]">{{ getAgentName(store.selectedTransaction.sellingAgentId) }}</div>
-                             <span class="bg-indigo-50 text-indigo-500 text-[9px] font-black px-2 py-0.5 rounded-md uppercase tracking-wider">Selling</span>
+                           <div class="flex flex-col sm:flex-row sm:items-center gap-0.5 sm:gap-2.5 mb-0.5 sm:mb-1">
+                             <div class="text-[13px] sm:text-[15px] font-black text-[#0B1A40]">{{ getAgentName(store.selectedTransaction.sellingAgentId) }}</div>
+                             <span class="bg-indigo-50 text-indigo-500 text-[8px] sm:text-[9px] font-black px-1.5 py-0.5 rounded uppercase tracking-wider w-fit">Selling</span>
                            </div>
-                           <div class="text-[12px] font-medium text-slate-500">50% of Agent Pool</div>
+                           <div class="text-[10px] sm:text-[12px] font-medium text-slate-500">50% of Agent Pool</div>
                          </div>
                       </div>
                       <div class="text-right">
-                        <div class="text-[18px] font-black text-[#0B1A40] mb-0.5">${{ ((store.selectedTransaction.totalServiceFee || 0) * 0.25).toLocaleString('en-US') }}<span class="text-[12px] text-slate-400">.00</span></div>
-                        <div v-if="store.selectedTransaction.status === 'completed'" class="text-[11px] font-bold text-emerald-500 flex items-center justify-end gap-1 px-2 py-0.5"><svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" /></svg> Paid</div>
-                        <div v-else-if="store.selectedTransaction.status === 'canceled'" class="text-[11px] font-bold text-slate-400 flex items-center justify-end gap-1 px-2 py-0.5"><svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12" /></svg></div>
-                        <div v-else class="text-[11px] font-bold text-amber-500 flex items-center justify-end gap-1 px-2 py-0.5"><svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg> In Progress</div>
+                        <div class="text-[14px] sm:text-[18px] font-black text-[#0B1A40] mb-0.5">${{ ((store.selectedTransaction.totalServiceFee || 0) * 0.25).toLocaleString('en-US') }}<span class="text-[10px] sm:text-[12px] text-slate-400">.00</span></div>
+                        <div v-if="store.selectedTransaction.status === 'completed'" class="text-[9px] sm:text-[11px] font-bold text-emerald-500 flex items-center justify-end gap-1 px-1 sm:px-2 py-0.5"><svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" /></svg> Paid</div>
+                        <div v-else-if="store.selectedTransaction.status === 'canceled'" class="text-[9px] sm:text-[11px] font-bold text-slate-400 flex items-center justify-end gap-1 px-1 sm:px-2 py-0.5"><svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12" /></svg></div>
+                        <div v-else class="text-[9px] sm:text-[11px] font-bold text-amber-500 flex items-center justify-end gap-1 px-1 sm:px-2 py-0.5"><svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg> In Progress</div>
                       </div>
                     </div>
                   </template>
@@ -493,7 +493,7 @@ watch([searchQuery, statusFilter], () => {
             <div class="contents lg:flex lg:flex-col lg:max-w-[320px] gap-6">
               
               <!-- Timeline/Stepper -->
-              <div class="bg-white border border-slate-100 shadow-[0_4px_24px_rgba(0,0,0,0.02)] rounded-[20px] p-6 relative order-1 lg:order-none">
+              <div class="w-full bg-white border border-slate-100 shadow-[0_4px_24px_rgba(0,0,0,0.02)] rounded-[20px] p-6 relative order-1 lg:order-none">
                  <div class="font-black text-[#0B1A40] mb-6 flex items-center gap-2 text-[15px]">
                    <svg class="w-4 h-4 text-[#5B4EFF]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                    Transaction Timeline
@@ -525,7 +525,7 @@ watch([searchQuery, statusFilter], () => {
               </div>
 
               <!-- Calculation Logic Info -->
-              <div class="bg-[#F8F9FB] border border-slate-100 rounded-[20px] p-6 relative overflow-hidden group order-3 lg:order-none">
+              <div class="w-full bg-[#F8F9FB] border border-slate-100 rounded-[20px] p-6 relative overflow-hidden group order-3 lg:order-none">
                  <div class="flex items-center gap-2 font-black text-[#0B1A40] mb-4 text-[14px]">
                    <svg class="w-4 h-4 text-[#5B4EFF]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path></svg>
                    Calculation Logic

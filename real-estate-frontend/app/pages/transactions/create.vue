@@ -27,6 +27,7 @@ const stageOptions = [
 
 // Real Agents from DB
 const agents = ref([])
+const selectableAgents = computed(() => agents.value.filter(a => a.role !== 'admin'))
 
 const fetchAgents = async () => {
   try {
@@ -304,14 +305,16 @@ const submitTransaction = async () => {
                   </div>
                  
                  <!-- Listing Agent Custom Dropdown -->
-                 <div v-if="openDropdown === 'listing' && authStore.isAdmin" class="absolute left-0 right-0 top-[calc(100%+8px)] bg-white border border-[#E2E8F0] rounded-xl shadow-[0_10px_40px_rgba(0,0,0,0.08)] py-1.5 z-40 animate-in fade-in slide-in-from-top-2">
-                   <div class="px-5 py-2 hover:bg-slate-50 cursor-pointer text-[#0B1A40] border-b border-slate-50 transition-colors" @click.stop="form.listingAgentId = ''; openDropdown = null">
-                      <span class="text-[13px] font-medium text-slate-400 italic">Clear</span>
-                   </div>
-                   <div v-for="agent in agents" :key="agent._id" @click.stop="form.listingAgentId = agent._id; openDropdown = null" class="px-5 py-3 hover:bg-indigo-50/50 cursor-pointer flex items-center justify-between text-[#0B1A40] transition-colors border-b border-slate-50 last:border-0">
-                      <span :class="['text-[13px]', form.listingAgentId === agent._id ? 'font-black text-[#5B4EFF]' : 'font-medium']">{{ agent.name }}</span>
-                      <svg v-if="form.listingAgentId === agent._id" class="w-4 h-4 text-[#5B4EFF]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" /></svg>
-                   </div>
+                 <div v-if="openDropdown === 'listing'" class="absolute left-0 right-0 top-[calc(100%+8px)] bg-white border border-[#E2E8F0] rounded-xl shadow-[0_10px_40px_rgba(0,0,0,0.08)] py-1.5 z-50 animate-in fade-in slide-in-from-top-2 overflow-hidden">
+                    <div class="px-5 py-2 hover:bg-slate-50 cursor-pointer text-[#0B1A40] border-b border-slate-50 transition-colors" @click.stop="form.listingAgentId = ''; openDropdown = null">
+                       <span class="text-[13px] font-medium text-slate-400 italic">Clear</span>
+                    </div>
+                    <div class="max-h-[220px] overflow-y-auto custom-scroll">
+                      <div v-for="agent in selectableAgents" :key="agent._id" @click.stop="form.listingAgentId = agent._id; openDropdown = null" class="px-5 py-3 hover:bg-indigo-50/50 cursor-pointer flex items-center justify-between text-[#0B1A40] transition-colors border-b border-slate-50 last:border-0">
+                         <span :class="['text-[13px]', form.listingAgentId === agent._id ? 'font-black text-[#5B4EFF]' : 'font-medium']">{{ agent.name }}</span>
+                         <svg v-if="form.listingAgentId === agent._id" class="w-4 h-4 text-[#5B4EFF]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" /></svg>
+                      </div>
+                    </div>
                  </div>
                </div>
             </div>
@@ -328,14 +331,16 @@ const submitTransaction = async () => {
                  </div>
                  
                  <!-- Selling Agent Custom Dropdown -->
-                 <div v-if="openDropdown === 'selling'" class="absolute left-0 right-0 top-[calc(100%+8px)] bg-white border border-[#E2E8F0] rounded-xl shadow-[0_10px_40px_rgba(0,0,0,0.08)] py-1.5 z-40 animate-in fade-in slide-in-from-top-2">
-                   <div class="px-5 py-2 hover:bg-slate-50 cursor-pointer text-[#0B1A40] border-b border-slate-50 transition-colors" @click.stop="form.sellingAgentId = ''; openDropdown = null">
-                      <span class="text-[13px] font-medium text-slate-400 italic">Clear (Remove)</span>
-                   </div>
-                   <div v-for="agent in agents" :key="agent._id" @click.stop="form.sellingAgentId = agent._id; openDropdown = null" class="px-5 py-3 hover:bg-indigo-50/50 cursor-pointer flex items-center justify-between text-[#0B1A40] transition-colors border-b border-slate-50 last:border-0">
-                      <span :class="['text-[13px]', form.sellingAgentId === agent._id ? 'font-black text-[#5B4EFF]' : 'font-medium']">{{ agent.name }}</span>
-                      <svg v-if="form.sellingAgentId === agent._id" class="w-4 h-4 text-[#5B4EFF]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" /></svg>
-                   </div>
+                 <div v-if="openDropdown === 'selling'" class="absolute left-0 right-0 top-[calc(100%+8px)] bg-white border border-[#E2E8F0] rounded-xl shadow-[0_10px_40px_rgba(0,0,0,0.08)] py-1.5 z-50 animate-in fade-in slide-in-from-top-2 overflow-hidden">
+                    <div class="px-5 py-2 hover:bg-slate-50 cursor-pointer text-[#0B1A40] border-b border-slate-50 transition-colors" @click.stop="form.sellingAgentId = ''; openDropdown = null">
+                       <span class="text-[13px] font-medium text-slate-400 italic">Clear (None)</span>
+                    </div>
+                    <div class="max-h-[220px] overflow-y-auto custom-scroll">
+                      <div v-for="agent in selectableAgents" :key="agent._id" @click.stop="form.sellingAgentId = agent._id; openDropdown = null" class="px-5 py-3 hover:bg-indigo-50/50 cursor-pointer flex items-center justify-between text-[#0B1A40] transition-colors border-b border-slate-50 last:border-0">
+                         <span :class="['text-[13px]', form.sellingAgentId === agent._id ? 'font-black text-[#5B4EFF]' : 'font-medium']">{{ agent.name }}</span>
+                         <svg v-if="form.sellingAgentId === agent._id" class="w-4 h-4 text-[#5B4EFF]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" /></svg>
+                      </div>
+                    </div>
                  </div>
                </div>
                <p v-if="showSellingAgentError" class="text-[11px] font-bold text-red-500 mt-2">

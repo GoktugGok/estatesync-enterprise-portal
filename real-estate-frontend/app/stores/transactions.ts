@@ -5,13 +5,26 @@ export const useTransactionStore = defineStore('transactions', {
   state: () => ({
     transactions: [] as any[],
     selectedTransaction: null as any | null,
-    loading: false
+    loading: false,
+    lastFetched: 0
   }),
   actions: {
-    async fetchTransactions() {
+    async fetchTransactions(force = false) {
+      // Simple cache: if fetched in last 30 seconds and not forced, skip loading state
+      const now = Date.now()
+      if (!force && this.transactions.length > 0 && (now - this.lastFetched < 30000)) {
+        // Just refresh in background without loading spinner
+        this._doFetch()
+        return
+      }
+
+      this.loading = true
+      await this._doFetch()
+      this.loading = false
+    },
+    async _doFetch() {
       const config = useRuntimeConfig()
       const auth = useAuthStore()
-      this.loading = true
       try {
         const data = await $fetch(`${config.public.apiBase}/transactions`, {
           headers: {
@@ -19,10 +32,9 @@ export const useTransactionStore = defineStore('transactions', {
           }
         })
         this.transactions = data as any[]
+        this.lastFetched = Date.now()
       } catch (error) {
-        console.error('Hata:', error)
-      } finally {
-        this.loading = false
+        console.error('Fetch error:', error)
       }
     },
     async completeTransaction(id: string) {
@@ -36,8 +48,8 @@ export const useTransactionStore = defineStore('transactions', {
           },
           body: { status: 'completed' }
         })
-        // Güncel halini tekrar çek
-        await this.fetchTransactions()
+        // Fetch fresh data
+        await this.fetchTransactions(true)
       } catch (error) {
         console.error('Hata:', error)
         alert('İşlem güncellenemedi!')
@@ -54,7 +66,7 @@ export const useTransactionStore = defineStore('transactions', {
           },
           body: payload
         })
-        await this.fetchTransactions()
+        await this.fetchTransactions(true)
       } catch (error) {
         console.error('Kayıt hatası:', error)
       }
@@ -70,7 +82,7 @@ export const useTransactionStore = defineStore('transactions', {
           },
           body: payload
         })
-        await this.fetchTransactions()
+        await this.fetchTransactions(true)
       } catch (error) {
         console.error('Güncelleme hatası:', error)
         throw error

@@ -2,12 +2,23 @@
 import { useAuthStore } from '~/stores/auth'
 import { useRouter } from 'vue-router'
 
+import { useTransactionStore } from '~/stores/transactions'
+import { useAgentStore } from '~/stores/agents'
+
 const authStore = useAuthStore()
+const transStore = useTransactionStore()
+const agentStore = useAgentStore()
 const router = useRouter()
 const sidebarOpen = ref(false)
 
 onMounted(() => {
   authStore.restoreFromStorage()
+  
+  // Prefetch data in background if logged in
+  if (authStore.token) {
+    transStore.fetchTransactions()
+    agentStore.fetchAgents()
+  }
 })
 
 const handleSignOut = () => {

@@ -2,16 +2,17 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useTransactionStore } from '~/stores/transactions'
+import { useAgentStore } from '~/stores/agents'
 import { useAuthStore } from '~/stores/auth'
 
 const route = useRoute()
 const router = useRouter()
 const store = useTransactionStore()
+const agentStore = useAgentStore()
 const authStore = useAuthStore()
 
 const agentId = route.params.id
 const agent = ref(null)
-const myTransactions = ref([])
 const filter = ref('All')
 const trendFilter = ref('Sales')
 const loading = ref(true)
@@ -41,22 +42,26 @@ const onPhotoChange = (e) => {
 
 onMounted(async () => {
   try {
-    const config = useRuntimeConfig()
-    const users = await $fetch(`${config.public.apiBase}/users`)
-    const found = users.find(u => u._id === agentId)
+    // Smart pre-fetching
+    await Promise.all([
+      agentStore.fetchAgents(),
+      store.fetchTransactions()
+    ])
+    
+    const found = agentStore.getAgentById(agentId)
     if (found) {
       agent.value = found
       editData.value = { ...found }
     }
   } catch (e) {
-    console.error('Failed to fetch user', e)
+    console.error('Failed to initialize profile data', e)
   }
 
-  if (store.transactions.length === 0) {
-    await store.fetchTransactions()
-  }
+  loading.value = false
+})
 
-  myTransactions.value = store.transactions.filter(t => {
+const myTransactions = computed(() => {
+  return store.transactions.filter(t => {
      const listId = typeof t.listingAgentId === 'object' ? t.listingAgentId?._id : t.listingAgentId;
      const sellId = typeof t.sellingAgentId === 'object' ? t.sellingAgentId?._id : t.sellingAgentId;
      return listId === agentId || sellId === agentId;
@@ -89,8 +94,6 @@ onMounted(async () => {
        _date: t.updatedAt ? new Date(t.updatedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'Unknown'
      }
   })
-  
-  loading.value = false
 })
 
 const stats = computed(() => {
@@ -343,36 +346,36 @@ const formatShortMoney = (val) => {
 
     <!-- Stats Grid -->
     <div class="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-6 mb-8">
-      <div class="bg-white rounded-[1.5rem] sm:rounded-[2rem] p-5 sm:p-7 shadow-sm relative overflow-hidden flex flex-col justify-between h-[130px] sm:h-[150px] border border-slate-50">
+      <div class="bg-white rounded-[1.5rem] sm:rounded-[2rem] p-4 sm:p-7 shadow-sm relative overflow-hidden flex flex-col justify-between h-[110px] sm:h-[150px] border border-slate-50">
         <div class="absolute -top-10 -right-10 w-40 h-40 bg-emerald-50 rounded-full opacity-50 blur-2xl"></div>
         <div class="relative z-10">
           <h3 class="text-[#0B1A40] text-[9px] sm:text-[11px] font-black uppercase tracking-widest leading-none">Earnings</h3>
           <p class="text-slate-400 text-[9px] sm:text-[11px] font-medium mt-1">YTD Commission</p>
         </div>
-        <div class="relative z-10 text-[24px] sm:text-[38px] font-black text-emerald-700 tracking-tight leading-none mt-2 sm:mt-4">
+        <div class="relative z-10 text-[20px] sm:text-[32px] font-black text-emerald-700 tracking-tight leading-none mt-2 sm:mt-4">
           {{ formatMoney(stats.pEarnings) }}
         </div>
       </div>
  
-      <div class="bg-white rounded-[1.5rem] sm:rounded-[2rem] p-5 sm:p-7 shadow-sm relative overflow-hidden flex flex-col justify-between h-[130px] sm:h-[150px] border border-slate-50">
+      <div class="bg-white rounded-[1.5rem] sm:rounded-[2rem] p-4 sm:p-7 shadow-sm relative overflow-hidden flex flex-col justify-between h-[110px] sm:h-[150px] border border-slate-50">
         <div class="absolute -top-10 -right-10 w-40 h-40 bg-indigo-50 rounded-full opacity-50 blur-2xl"></div>
         <div class="relative z-10">
           <h3 class="text-[#0B1A40] text-[9px] sm:text-[11px] font-black uppercase tracking-widest leading-none">Contribution</h3>
           <p class="text-slate-400 text-[9px] sm:text-[11px] font-medium mt-1">Agency Share</p>
         </div>
-        <div class="relative z-10 text-[24px] sm:text-[38px] font-black text-[#4A3AFF] tracking-tight leading-none mt-2 sm:mt-4">
+        <div class="relative z-10 text-[20px] sm:text-[32px] font-black text-[#4A3AFF] tracking-tight leading-none mt-2 sm:mt-4">
           {{ formatMoney(stats.aContribution) }}
         </div>
       </div>
  
-      <div class="bg-white rounded-[1.5rem] sm:rounded-[2rem] p-5 sm:p-7 shadow-sm relative overflow-hidden flex flex-col justify-between h-[130px] sm:h-[150px] border border-slate-50">
+      <div class="bg-white rounded-[1.5rem] sm:rounded-[2rem] p-4 sm:p-7 shadow-sm relative overflow-hidden flex flex-col justify-between h-[110px] sm:h-[150px] border border-slate-50 col-span-2 lg:col-span-1">
         <div class="absolute -top-10 -right-10 w-40 h-40 bg-indigo-50 rounded-full opacity-50 blur-2xl pointer-events-none"></div>
         <div class="relative z-10">
           <h3 class="text-[#0B1A40] text-[9px] sm:text-[11px] font-black uppercase tracking-widest leading-none">Deals</h3>
           <p class="text-slate-400 text-[9px] sm:text-[11px] font-medium mt-1">{{ stats.total }} transactions</p>
         </div>
         <div class="mt-2 sm:mt-4 relative z-10">
-          <div class="text-[24px] sm:text-[38px] font-black text-indigo-700 tracking-tight leading-none">{{ stats.completed }}</div>
+          <div class="text-[20px] sm:text-[32px] font-black text-indigo-700 tracking-tight leading-none">{{ stats.completed }}</div>
         </div>
       </div>
     </div>
@@ -483,7 +486,7 @@ const formatShortMoney = (val) => {
     <div class="flex flex-col xl:grid xl:grid-cols-12 gap-6">
       
       <!-- Earnings Trend Chart (Col 3) -->
-      <div class="xl:col-span-3 bg-white rounded-[1.5rem] sm:rounded-[2.5rem] py-6 px-7 shadow-sm flex flex-col border border-slate-50 h-auto xl:h-[460px] self-start shrink-0">
+      <div class="xl:col-span-3 w-full bg-white rounded-[1.5rem] sm:rounded-[2.5rem] py-6 px-7 shadow-sm flex flex-col border border-slate-50 h-auto xl:h-[460px] shrink-0">
          <div class="flex items-center justify-between mb-5">
            <h3 class="text-[17px] font-black">Earnings Trend</h3>
          </div>

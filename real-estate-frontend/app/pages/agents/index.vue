@@ -2,14 +2,14 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useTransactionStore } from '~/stores/transactions'
+import { useAgentStore } from '~/stores/agents'
 import { useAuthStore } from '~/stores/auth'
 
-const users = ref([])
 const searchQuery = ref('')
-const loading = ref(true)
 const showAddModal = ref(false)
 const authStore = useAuthStore()
 const transStore = useTransactionStore()
+const agentStore = useAgentStore()
 const router = useRouter()
 
 const newAgent = ref({
@@ -21,12 +21,14 @@ const newAgent = ref({
   instagram: '',
   linkedin: ''
 })
-const addError = ref('')
-const addLoading = ref(false)
-const photoFile = ref(null)
-const photoPreview = ref('')
- 
-const isMobile = ref(false)
+    const addError = ref('')
+    const addLoading = ref(false)
+    const photoFile = ref(null)
+    const photoPreview = ref('')
+     
+    const isAdmin = computed(() => authStore.user?.role === 'admin')
+
+    const isMobile = ref(false)
 if (process.client) {
   isMobile.value = window.innerWidth < 640
   window.addEventListener('resize', () => {
@@ -51,20 +53,18 @@ const removePhoto = () => {
 
 onMounted(async () => {
   try {
-    const config = useRuntimeConfig()
-    const data = await $fetch(`${config.public.apiBase}/users`)
-    if (data && Array.isArray(data)) {
-      users.value = data.filter(u => u.role === 'agent')
-    }
-    if (transStore.transactions.length === 0) {
-      await transStore.fetchTransactions()
-    }
+    // Both stores now have smart caching/background fetch
+    await Promise.all([
+      agentStore.fetchAgents(),
+      transStore.fetchTransactions()
+    ])
   } catch(e) {
     console.error(e)
-  } finally {
-    loading.value = false
   }
 })
+
+const users = computed(() => agentStore.agents)
+const loading = computed(() => agentStore.loading || transStore.loading)
 
 const agentsStats = computed(() => {
   const stats = {}
@@ -142,12 +142,8 @@ const getProgressColor = (pct) => {
   return '#f59e0b'                  // amber
 }
 
-const handleAdd = async () => {
-  addError.value = ''
-  if (!newAgent.value.name || !newAgent.value.email) {
-    addError.value = 'Name and email are required.'
-    return
-  }
+const addAgent = async () => {
+  if (!isAdmin.value) return
   try {
     addLoading.value = true
     const config = useRuntimeConfig()
@@ -186,7 +182,7 @@ const handleAdd = async () => {
         </div>
         <p class="text-[13px] sm:text-[14px] text-slate-400 font-medium">Manage your licensed agents and their performance.</p>
       </div>
-      <button @click="showAddModal = true" class="bg-[#5B4EFF] hover:bg-indigo-700 text-white px-4 sm:px-5 py-2.5 sm:py-3 rounded-2xl text-[11px] sm:text-[13px] font-black shadow-sm transition-all flex items-center justify-center gap-2 hover:shadow-indigo-200 hover:shadow-lg w-full sm:w-fit shrink-0">
+      <button v-if="isAdmin" @click="showAddModal = true" class="bg-[#5B4EFF] hover:bg-indigo-700 text-white px-4 sm:px-5 py-2.5 sm:py-3 rounded-2xl text-[11px] sm:text-[13px] font-black shadow-sm transition-all flex items-center justify-center gap-2 hover:shadow-indigo-200 hover:shadow-lg w-full sm:w-fit shrink-0">
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"></path></svg>
         Add Agent
       </button>
@@ -391,7 +387,7 @@ const handleAdd = async () => {
             <button @click="showAddModal = false" class="flex-1 bg-slate-50 hover:bg-slate-100 border border-slate-200 border-dashed text-slate-500 font-bold text-[13px] rounded-2xl py-3.5 transition-colors">
               Cancel
             </button>
-            <button @click="handleAdd" :disabled="addLoading" 
+            <button @click="addAgent" :disabled="addLoading" 
                     class="flex-1 bg-[#5B4EFF] hover:bg-indigo-700 text-white font-bold text-[13px] rounded-2xl py-3.5 transition-colors shadow-sm flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed">
               <svg v-if="addLoading" class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
               <svg v-else class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"></path></svg>
