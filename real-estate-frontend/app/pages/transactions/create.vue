@@ -1,10 +1,11 @@
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useTransactionStore } from '~/stores/transactions'
+import { useAuthStore } from '~/stores/auth'
 
 const router = useRouter()
 const store = useTransactionStore()
+const authStore = useAuthStore()
 
 // State for custom dropdowns
 const openDropdown = ref(null)
@@ -18,10 +19,10 @@ const closeDropdowns = () => {
 }
 
 const stageOptions = [
-  { value: 'agreement', label: 'Agreement (Sözleşme Aşaması)' },
-  { value: 'earnest_money', label: 'Earnest Money (Kapora Alındı)' },
-  { value: 'title_deed', label: 'Title Deed (Tapu Süreci)' },
-  { value: 'completed', label: 'Completed (Tamamlandı)' }
+  { value: 'agreement', label: 'Agreement' },
+  { value: 'earnest_money', label: 'Earnest Money' },
+  { value: 'title_deed', label: 'Title Deed' },
+  { value: 'completed', label: 'Completed' }
 ]
 
 // Real Agents from DB
@@ -42,6 +43,11 @@ const fetchAgents = async () => {
 onMounted(() => {
   fetchAgents()
   document.addEventListener('click', closeDropdowns)
+  
+  // Rule: If agent and not admin, listing is automatically them
+  if (!authStore.isAdmin && authStore.user) {
+    form.value.listingAgentId = authStore.user._id
+  }
 })
 
 onUnmounted(() => {
@@ -71,6 +77,7 @@ const currentSellingLabel = computed(() => {
 
 const loading = ref(false)
 const errorMsg = ref('')
+const successMsg = ref('')
 
 // Currency Formatting
 const totalServiceFeeNum = computed(() => {
@@ -103,11 +110,25 @@ const showSellingAgentError = computed(() => {
   return isSellingAgentRequired.value && !form.value.sellingAgentId
 })
 
+const showEarnestMoneyWarning = computed(() => {
+  return form.value.sellingAgentId && form.value.status === 'agreement'
+})
+
 const isValid = computed(() => {
   return form.value.title.trim().length > 0 &&
          totalServiceFeeNum.value > 0 &&
          form.value.listingAgentId &&
-         isSellingAgentValid.value
+         isSellingAgentValid.value &&
+         !showEarnestMoneyWarning.value
+})
+
+// Alert logic for Earnest Money requirement
+watch([() => form.value.sellingAgentId, () => form.value.status], ([newSellingId, newStatus]) => {
+  if (newSellingId && newStatus === 'agreement') {
+    errorMsg.value = 'Alert: Since a Selling Agent is selected, the transaction stage must be Earnest Money or further.'
+  } else if (errorMsg.value?.includes('Earnest Money')) {
+    errorMsg.value = ''
+  }
 })
 
 // Komisyon Hesaplaması Yansıtma
@@ -141,11 +162,11 @@ const submitTransaction = async () => {
       sellingAgentId: form.value.sellingAgentId || null
     })
     
-    // Toast simulation
+    // Success simulation
+    successMsg.value = 'Transaction Successfully Created!'
     setTimeout(() => {
-       alert('Transaction Successfully Created!')
        router.push('/transactions')
-    }, 500)
+    }, 1500)
     
   } catch(e) {
     errorMsg.value = 'An error occurred during submission: ' + e.message
@@ -160,21 +181,21 @@ const submitTransaction = async () => {
     
     <!-- Top Header & Actions -->
     <div class="flex justify-between items-start mb-10">
-      <div class="flex items-center gap-5">
-        <button @click="router.push('/transactions')" class="w-11 h-11 bg-white border border-slate-200 rounded-full flex items-center justify-center hover:bg-slate-50 transition-colors shadow-sm">
-          <svg class="w-5 h-5 text-[#5B4EFF]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
+      <div class="flex items-center gap-4 sm:gap-5">
+        <button @click="router.push('/transactions')" class="w-9 h-9 sm:w-11 sm:h-11 bg-white border border-slate-200 rounded-full flex items-center justify-center hover:bg-slate-50 transition-colors shadow-sm">
+          <svg class="w-4 h-4 sm:w-5 sm:h-5 text-[#5B4EFF]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
         </button>
         <div>
-          <h1 class="text-3xl font-black text-[#0B1A40] tracking-tight">New Transaction</h1>
-          <p class="text-[13px] font-medium text-slate-500 mt-1">Create a new ledger entry. Fill in the required details below.</p>
+          <h1 class="text-[22px] sm:text-3xl font-black text-[#0B1A40] tracking-tight leading-none">New Transaction</h1>
+          <p class="text-[11px] sm:text-[13px] font-medium text-slate-500 mt-1">Create a new ledger entry. Fill details below.</p>
         </div>
       </div>
       
-      <div class="flex items-center gap-3">
-        <button @click="router.push('/transactions')" class="px-6 py-2.5 rounded-xl border border-slate-200 font-bold text-slate-600 hover:bg-slate-50 transition-colors text-[13px]">
+      <div class="flex items-center gap-2 sm:gap-3">
+        <button @click="router.push('/transactions')" class="px-4 sm:px-6 py-2 sm:py-2.5 rounded-xl border border-slate-200 font-bold text-slate-600 hover:bg-slate-50 transition-colors text-[11px] sm:text-[13px]">
           Cancel
         </button>
-        <button @click="submitTransaction" :disabled="!isValid || loading" :class="['px-6 py-2.5 rounded-xl font-bold text-white text-[13px] flex items-center gap-2 shadow-sm transition-all', isValid && !loading ? 'bg-[#5B4EFF] hover:bg-indigo-700' : 'bg-slate-300 cursor-not-allowed opacity-70']">
+        <button @click="submitTransaction" :disabled="!isValid || loading" :class="['px-4 sm:px-6 py-2 sm:py-2.5 rounded-xl font-bold text-white text-[11px] sm:text-[13px] flex items-center gap-2 shadow-sm transition-all', isValid && !loading ? 'bg-[#5B4EFF] hover:bg-indigo-700' : 'bg-slate-300 cursor-not-allowed opacity-70']">
           <svg v-if="loading" class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
           <svg v-else class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"></path></svg>
           Start Transaction
@@ -186,6 +207,12 @@ const submitTransaction = async () => {
     <div v-if="errorMsg" class="mb-6 bg-red-50 border border-red-200 text-red-700 px-5 py-4 rounded-xl flex items-center gap-3 shadow-sm animate-in fade-in slide-in-from-top-4">
       <svg class="w-5 h-5 flex-shrink-0 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
       <span class="text-sm font-bold">{{ errorMsg }}</span>
+    </div>
+
+    <!-- Success Toast Box -->
+    <div v-if="successMsg" class="mb-6 bg-emerald-50 border border-emerald-200 text-emerald-700 px-5 py-4 rounded-xl flex items-center gap-3 shadow-sm animate-in fade-in slide-in-from-top-4">
+      <svg class="w-5 h-5 flex-shrink-0 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+      <span class="text-sm font-bold">{{ successMsg }}</span>
     </div>
 
     <div class="space-y-6">
@@ -269,14 +296,15 @@ const submitTransaction = async () => {
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-6 relative">
             <div>
                <label class="block text-[12px] font-bold text-slate-600 mb-2">Listing Agent</label>
-               <div class="relative cursor-pointer" @click="toggleDropdown('listing', $event)">
-                 <div class="w-full border border-slate-200 rounded-xl px-4 py-3 text-[14px] font-medium text-[#0B1A40] transition-colors focus-within:border-[#5B4EFF] bg-white flex justify-between items-center">
-                   <span>{{ currentListingLabel }}</span>
-                   <svg :class="['w-4 h-4 text-slate-400 transition-transform duration-200', openDropdown === 'listing' ? 'rotate-180 text-[#5B4EFF]' : '']" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"></path></svg>
-                 </div>
+                <div class="relative cursor-pointer" @click="authStore.isAdmin && toggleDropdown('listing', $event)">
+                  <div :class="['w-full border rounded-xl px-4 py-3 text-[14px] font-medium transition-colors flex justify-between items-center bg-white', !authStore.isAdmin ? 'bg-slate-50 border-slate-200 cursor-not-allowed text-slate-500' : 'border-slate-200 text-[#0B1A40] focus-within:border-[#5B4EFF]']">
+                    <span>{{ currentListingLabel }}</span>
+                    <svg v-if="authStore.isAdmin" :class="['w-4 h-4 text-slate-400 transition-transform duration-200', openDropdown === 'listing' ? 'rotate-180 text-[#5B4EFF]' : '']" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"></path></svg>
+                    <svg v-else class="w-4 h-4 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
+                  </div>
                  
                  <!-- Listing Agent Custom Dropdown -->
-                 <div v-if="openDropdown === 'listing'" class="absolute left-0 right-0 top-[calc(100%+8px)] bg-white border border-[#E2E8F0] rounded-xl shadow-[0_10px_40px_rgba(0,0,0,0.08)] py-1.5 z-40 animate-in fade-in slide-in-from-top-2">
+                 <div v-if="openDropdown === 'listing' && authStore.isAdmin" class="absolute left-0 right-0 top-[calc(100%+8px)] bg-white border border-[#E2E8F0] rounded-xl shadow-[0_10px_40px_rgba(0,0,0,0.08)] py-1.5 z-40 animate-in fade-in slide-in-from-top-2">
                    <div class="px-5 py-2 hover:bg-slate-50 cursor-pointer text-[#0B1A40] border-b border-slate-50 transition-colors" @click.stop="form.listingAgentId = ''; openDropdown = null">
                       <span class="text-[13px] font-medium text-slate-400 italic">Clear</span>
                    </div>

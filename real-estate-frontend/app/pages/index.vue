@@ -1,7 +1,10 @@
 <script setup>
-import { useRouter } from 'vue-router'
+import { useTransactionStore } from '~/stores/transactions'
+import { useAuthStore } from '~/stores/auth'
+
 const router = useRouter()
 const transStore = useTransactionStore()
+const authStore = useAuthStore()
 
 onMounted(async () => {
   await transStore.fetchTransactions()
@@ -114,12 +117,16 @@ const chartData = computed(() => {
 
 const sortedTransactions = computed(() => {
   return [...transStore.transactions].sort((a, b) => {
-    // Put 'completed' at the bottom
-    if (a.status === 'completed' && b.status !== 'completed') return 1
-    if (a.status !== 'completed' && b.status === 'completed') return -1
     return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
   })
 })
+
+const canManage = (t) => {
+  if (authStore.isAdmin) return true
+  const listId = typeof t.listingAgentId === 'object' ? t.listingAgentId?._id : t.listingAgentId
+  const sellId = typeof t.sellingAgentId === 'object' ? t.sellingAgentId?._id : t.sellingAgentId
+  return authStore.user?._id === listId || authStore.user?._id === sellId
+}
 </script>
 
 <template>
@@ -127,57 +134,55 @@ const sortedTransactions = computed(() => {
     <!-- Header Removed by User Request -->
 
     <!-- Cards -->
-    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6 mt-8">
+    <!-- Cards -->
+    <div class="grid grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4 mb-6 mt-4 sm:mt-8">
       <!-- 1 -->
-      <div class="p-5 bg-white border border-slate-100 rounded-2xl shadow-[0_2px_10px_rgba(0,0,0,0.01)] flex flex-col justify-between">
-        <h3 class="text-[12px] font-bold text-slate-400 mb-3 uppercase tracking-widest whitespace-nowrap overflow-hidden text-ellipsis">Total Company Profit</h3>
-        <div class="flex items-baseline gap-2 mb-4">
-          <span class="text-3xl font-black text-slate-800">${{ stats.totalRevenue.toLocaleString('en-US') }}</span>
-          <span class="text-slate-400 text-sm font-bold">USD</span>
+      <div class="p-4 sm:p-5 bg-white border border-slate-100 rounded-2xl shadow-[0_2px_10px_rgba(0,0,0,0.01)] flex flex-col justify-between">
+        <h3 class="text-[9px] sm:text-[11px] font-black text-slate-400 mb-2 sm:mb-3 uppercase tracking-widest truncate">Total Company Profit</h3>
+        <div class="flex items-baseline gap-1.5 sm:gap-2 mb-3 sm:mb-4">
+          <span class="text-xl sm:text-3xl font-black text-slate-800">${{ stats.totalRevenue.toLocaleString('en-US') }}</span>
+          <span class="text-slate-400 text-[10px] sm:text-xs font-bold">USD</span>
         </div>
-        <div class="flex items-center gap-2 text-xs">
-          <span class="text-emerald-500 flex items-center gap-1 font-medium bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-100">
-            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 10l7-7m0 0l7 7m-7-7v18"></path></svg>
-            Revenue from {{ stats.completedCount }} deals
+        <div class="flex items-center gap-2 text-[10px]">
+          <span class="text-emerald-500 flex items-center gap-1 font-black bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-100/50">
+            <svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 10l7-7m0 0l7 7m-7-7v18"></path></svg>
+            {{ stats.completedCount }} Deals
           </span>
         </div>
       </div>
       <!-- 2 -->
-      <div class="p-5 bg-white border border-slate-100 rounded-2xl shadow-[0_2px_10px_rgba(0,0,0,0.01)] flex flex-col justify-between">
-        <h3 class="text-[12px] font-bold text-slate-400 mb-3 uppercase tracking-widest whitespace-nowrap overflow-hidden text-ellipsis">Active Transactions</h3>
-        <div class="flex items-baseline gap-2 mb-4">
-          <span class="text-3xl font-black text-slate-800">{{ stats.activeCount }}</span>
-          <span class="text-slate-400 text-lg">-</span>
+      <div class="p-4 sm:p-5 bg-white border border-slate-100 rounded-2xl shadow-[0_2px_10px_rgba(0,0,0,0.01)] flex flex-col justify-between">
+        <h3 class="text-[9px] sm:text-[11px] font-black text-slate-400 mb-2 sm:mb-3 uppercase tracking-widest truncate">Active Transactions</h3>
+        <div class="flex items-baseline gap-1.5 sm:gap-2 mb-3 sm:mb-4">
+          <span class="text-xl sm:text-3xl font-black text-slate-800">{{ stats.activeCount }}</span>
         </div>
-        <div class="flex items-center gap-2 text-xs">
-          <span class="text-indigo-500 flex items-center gap-1 font-medium bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-100">
-            Pending close
+        <div class="flex items-center gap-2 text-[10px]">
+          <span class="text-indigo-500 flex items-center gap-1 font-black bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-100/50">
+            In Progress
           </span>
         </div>
       </div>
       <!-- 3 -->
-      <div class="p-5 bg-white border border-slate-100 rounded-2xl shadow-[0_2px_10px_rgba(0,0,0,0.01)] flex flex-col justify-between">
-        <h3 class="text-[12px] font-bold text-slate-400 mb-3 uppercase tracking-widest whitespace-nowrap overflow-hidden text-ellipsis">Completed Deals</h3>
-        <div class="flex items-baseline gap-2 mb-4">
-          <span class="text-3xl font-black text-slate-800">{{ stats.completedCount }}</span>
-          <span class="text-slate-400 text-lg">-</span>
+      <div class="p-4 sm:p-5 bg-white border border-slate-100 rounded-2xl shadow-[0_2px_10px_rgba(0,0,0,0.01)] flex flex-col justify-between">
+        <h3 class="text-[9px] sm:text-[11px] font-black text-slate-400 mb-2 sm:mb-3 uppercase tracking-widest truncate">Completed Deals</h3>
+        <div class="flex items-baseline gap-1.5 sm:gap-2 mb-3 sm:mb-4">
+          <span class="text-xl sm:text-3xl font-black text-slate-800">{{ stats.completedCount }}</span>
         </div>
-        <div class="flex items-center gap-2 text-xs">
-          <span class="text-emerald-500 flex items-center gap-1 font-medium bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-100">
-            Successfully closed
+        <div class="flex items-center gap-2 text-[10px]">
+          <span class="text-emerald-500 flex items-center gap-1 font-black bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-100/50">
+            Finalized
           </span>
         </div>
       </div>
       <!-- 4 -->
-      <div class="p-5 bg-white border border-slate-100 rounded-2xl shadow-[0_2px_10px_rgba(0,0,0,0.01)] flex flex-col justify-between">
-        <h3 class="text-[12px] font-bold text-slate-400 mb-3 uppercase tracking-widest whitespace-nowrap overflow-hidden text-ellipsis">Total Listings</h3>
-        <div class="flex items-baseline gap-2 mb-4">
-          <span class="text-3xl font-black text-slate-800">{{ stats.transactionCount }}</span>
-          <span class="text-slate-400 text-lg">-</span>
+      <div class="p-4 sm:p-5 bg-white border border-slate-100 rounded-2xl shadow-[0_2px_10px_rgba(0,0,0,0.01)] flex flex-col justify-between">
+        <h3 class="text-[9px] sm:text-[11px] font-black text-slate-400 mb-2 sm:mb-3 uppercase tracking-widest truncate">Total Listings</h3>
+        <div class="flex items-baseline gap-1.5 sm:gap-2 mb-3 sm:mb-4">
+          <span class="text-xl sm:text-3xl font-black text-slate-800">{{ stats.transactionCount }}</span>
         </div>
-        <div class="flex items-center gap-2 text-xs">
-          <span class="text-slate-500 flex items-center gap-1 font-medium bg-slate-50 px-1.5 py-0.5 rounded border border-slate-200">
-            Lifetime records
+        <div class="flex items-center gap-2 text-[10px]">
+          <span class="text-slate-500 flex items-center gap-1 font-black bg-slate-50 px-1.5 py-0.5 rounded border border-slate-200/50">
+            Lifetime
           </span>
         </div>
       </div>
@@ -188,20 +193,20 @@ const sortedTransactions = computed(() => {
       
       <!-- Recent Transactions Table -->
       <div class="lg:col-span-2 bg-white rounded-[2rem] shadow-[0_2px_10px_rgba(0,0,0,0.01)] border border-slate-100 flex flex-col overflow-hidden">
-        <div class="p-6 border-b border-slate-50 flex justify-between items-center">
-          <h3 class="text-[15px] font-black text-slate-800">Recent Transactions</h3>
-          <NuxtLink to="/transactions" class="text-xs font-bold text-indigo-600 hover:text-indigo-800 transition-colors">View All →</NuxtLink>
+        <div class="p-5 sm:p-6 border-b border-slate-50 flex justify-between items-center">
+          <h3 class="text-[13px] sm:text-[15px] font-black text-slate-800">Recent Transactions</h3>
+          <NuxtLink to="/transactions" class="text-[10px] sm:text-xs font-bold text-indigo-600 hover:text-indigo-800 transition-colors">View All →</NuxtLink>
         </div>
         
         <div class="overflow-x-auto min-h-[400px]">
           <table class="w-full text-left whitespace-nowrap">
             <thead class="bg-slate-50/50 border-b border-slate-100">
               <tr>
-                <th class="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Property Name</th>
-                <th class="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Status</th>
-                <th class="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Date</th>
-                <th class="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Total Fee</th>
-                <th class="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Action</th>
+                <th class="px-4 sm:px-6 py-4 text-[8.5px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest">Property Name</th>
+                <th class="px-4 sm:px-6 py-4 text-[8.5px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest">Status</th>
+                <th class="px-4 sm:px-6 py-4 text-[8.5px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest">Date</th>
+                <th class="px-4 sm:px-6 py-4 text-[8.5px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Total Fee</th>
+                <th class="px-4 sm:px-6 py-4 text-[8.5px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Action</th>
               </tr>
             </thead>
             <tbody class="divide-y divide-slate-50">
@@ -231,6 +236,9 @@ const sortedTransactions = computed(() => {
                   <span v-else-if="t.status === 'title_deed'" class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[10px] font-black bg-purple-50 text-purple-600 border border-purple-200/60 uppercase tracking-wider">
                     <span class="w-1.5 h-1.5 rounded-full bg-purple-500 shadow-sm"></span> Title Deed
                   </span>
+                  <span v-else-if="t.status === 'canceled'" class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[10px] font-black bg-red-50 text-red-600 border border-red-200/60 uppercase tracking-wider">
+                    <span class="w-1.5 h-1.5 rounded-full bg-red-500 shadow-sm"></span> Canceled
+                  </span>
                   <span v-else class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[10px] font-black bg-slate-50 text-slate-600 border border-slate-200/60 uppercase tracking-wider">
                     <span class="w-1.5 h-1.5 rounded-full bg-slate-500 shadow-sm"></span> {{ t.status }}
                   </span>
@@ -241,13 +249,13 @@ const sortedTransactions = computed(() => {
                 <td class="px-6 py-4 text-[13px] font-black text-slate-800 text-right">
                   ${{ t.totalServiceFee?.toLocaleString('en-US') }}
                 </td>
-                <td class="px-6 py-4 text-center">
-                  <button v-if="t.status !== 'completed'" @click.stop="router.push(`/transactions/manage-${t._id}`)" 
-                          class="bg-indigo-600 text-white text-[10px] px-4 py-2 rounded-lg font-bold shadow-sm hover:bg-indigo-800 hover:shadow-indigo-200 transition uppercase tracking-widest">
+                <td class="px-4 sm:px-6 py-4 text-center">
+                  <button v-if="t.status !== 'completed' && t.status !== 'canceled' && canManage(t)" @click.stop="router.push(`/transactions/manage-${t._id}`)" 
+                          class="bg-indigo-600 text-white text-[8.5px] sm:text-[10px] px-3.5 sm:px-5 py-2 sm:py-2.5 rounded-lg font-bold shadow-sm hover:bg-indigo-800 hover:shadow-indigo-200 transition uppercase tracking-widest">
                     Manage
                   </button>
                   <button v-else @click.stop="router.push(`/transactions?view=${t._id}`)" 
-                          class="text-emerald-600 bg-emerald-50 hover:bg-emerald-100 hover:text-emerald-700 text-[10px] font-bold flex items-center justify-center gap-1.5 uppercase tracking-widest px-4 py-2 rounded-lg border border-emerald-200/50 shadow-sm transition w-full">
+                          class="text-emerald-600 bg-emerald-50 hover:bg-emerald-100 hover:text-emerald-700 text-[8.5px] sm:text-[10px] font-bold inline-flex items-center justify-center gap-1.5 uppercase tracking-widest px-3.5 sm:px-5 py-2 sm:py-2.5 rounded-lg border border-emerald-200/50 shadow-sm transition">
                     <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
                     View
                   </button>
@@ -262,7 +270,7 @@ const sortedTransactions = computed(() => {
       </div>
 
       <!-- Financial Chart (Donut) -->
-      <div class="bg-white rounded-[2rem] shadow-[0_2px_10px_rgba(0,0,0,0.01)] border border-slate-100 p-8 flex flex-col items-center sticky top-24 h-fit">
+      <div :class="['bg-white rounded-[2rem] shadow-[0_2px_10px_rgba(0,0,0,0.01)] border border-slate-100 p-8 flex flex-col items-center sticky top-24 h-fit transition-all', selectedTx?.status === 'canceled' ? 'grayscale opacity-60' : '']">
         <div class="w-full flex justify-between items-center mb-8 pb-4 border-b border-slate-50">
            <h3 class="text-[15px] font-black text-slate-800">Financial Breakdown</h3>
            <div class="px-2.5 py-1 bg-indigo-50 border border-indigo-100 rounded-md text-[9px] font-black text-indigo-600 uppercase tracking-widest">Analytics</div>

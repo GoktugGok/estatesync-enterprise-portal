@@ -9,7 +9,7 @@ export class Transaction extends Document {
   @Prop({ required: true })
   totalServiceFee!: number;
 
-  @Prop({ required: true, enum: ['agreement', 'earnest_money', 'title_deed', 'completed'], default: 'agreement' })
+  @Prop({ required: true, enum: ['agreement', 'earnest_money', 'title_deed', 'completed', 'canceled'], default: 'agreement' })
   status!: string;
 
   @Prop({ type: Types.ObjectId, ref: 'User', required: true })

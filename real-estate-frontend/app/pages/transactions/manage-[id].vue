@@ -7,16 +7,27 @@ import { useAuthStore } from '~/stores/auth'
 const route = useRoute()
 const router = useRouter()
 const store = useTransactionStore()
+
+// Prevent UI flash: clear synchronously if no view trigger
+if (!route.query.view || route.query.view === 'undefined') {
+  store.selectedTransaction = null
+}
 const authStore = useAuthStore()
 
 const transactionId = route.params.id
 
-const transaction = ref(null)
-const loading = ref(true)
-const selectedStage = ref('')
-const selectedSellingAgent = ref('')
+const transaction = ref(store.transactions.find(tx => tx._id === transactionId) || null)
+const loading = ref(!transaction.value)
+const selectedStage = ref(transaction.value?.status || 'agreement')
+const selectedSellingAgent = ref(
+  typeof transaction.value?.sellingAgentId === 'object' 
+    ? transaction.value.sellingAgentId?._id 
+    : (transaction.value?.sellingAgentId || '')
+)
 const errorMsg = ref('')
 const successMsg = ref('')
+
+// Stage transition flow: Agreement -> Earnest Money -> Title Deed -> Completed
 
 const isDropdownOpen = ref(false)
 const toggleDropdown = (e) => {
@@ -42,21 +53,26 @@ const stageOrder = ['agreement', 'earnest_money', 'title_deed', 'completed']
 
 // Fetch data
 onMounted(async () => {
+  if (!authStore.isLoggedIn) {
+     router.push('/login')
+     return
+  }
   try {
-    // Make sure transactions are loaded
-    if (store.transactions.length === 0) {
+    // 1. If we don't have the transaction yet, fetch it
+    if (!transaction.value) {
+      loading.value = true
       await store.fetchTransactions()
+      const t = store.transactions.find(tx => tx._id === transactionId)
+      if (!t) {
+        router.push('/transactions')
+        return
+      }
+      transaction.value = t
+      selectedStage.value = t.status || 'agreement'
+      selectedSellingAgent.value = typeof t.sellingAgentId === 'object' ? t.sellingAgentId?._id : (t.sellingAgentId || '')
     }
-    const t = store.transactions.find(tx => tx._id === transactionId)
-    if (!t) {
-      router.push('/transactions')
-      return
-    }
-    transaction.value = t
-    selectedStage.value = t.status || 'agreement'
-    selectedSellingAgent.value = typeof t.sellingAgentId === 'object' ? t.sellingAgentId?._id : (t.sellingAgentId || '')
 
-    // Fetch agents for the dropdown
+    // 2. Fetch agents for the dropdown in the background
     const config = useRuntimeConfig()
     const data = await $fetch(`${config.public.apiBase}/users`)
     if (data && Array.isArray(data)) {
@@ -76,13 +92,24 @@ onUnmounted(() => {
 
 const getAgentName = (id) => {
    if (!id) return ''
+   // 1. Check if it's in the full agents list (most reliable for name changes)
    const agent = agents.value.find(a => a._id === id)
    if (agent) return agent.name
-   // Fallback to existing transaction data if not in fetched agents
-   if (transaction.value && transaction.value.listingAgentId && (transaction.value.listingAgentId._id === id || transaction.value.listingAgentId === id)) {
-       return typeof transaction.value.listingAgentId === 'object' ? transaction.value.listingAgentId.name : 'Unknown'
+   
+   // 2. Immediate fallback: Check if the transaction object already has this agent populated
+   if (transaction.value) {
+     const listId = typeof transaction.value.listingAgentId === 'object' ? transaction.value.listingAgentId?._id : transaction.value.listingAgentId
+     const sellId = typeof transaction.value.sellingAgentId === 'object' ? transaction.value.sellingAgentId?._id : transaction.value.sellingAgentId
+     
+     if (listId === id && typeof transaction.value.listingAgentId === 'object') {
+       return transaction.value.listingAgentId.name
+     }
+     if (sellId === id && typeof transaction.value.sellingAgentId === 'object') {
+       return transaction.value.sellingAgentId.name
+     }
    }
-   return 'Unknown'
+
+   return 'Loading...'
 }
 
 const currentListingAgentId = computed(() => {
@@ -115,18 +142,31 @@ const financialSplit = computed(() => {
   let list = 0
   let sell = 0
   
-  if (!selectedSellingAgent.value) {
+  // Ensure we compare strings to avoid object/string mismatch issues
+  const listId = String(currentListingAgentId.value || '')
+  const sellId = String(selectedSellingAgent.value || '')
+
+  if (!sellId) {
+    // No selling agent assigned: Listing agent gets everything in pool
     list = pool
     sell = 0
-  } else if (currentListingAgentId.value === selectedSellingAgent.value) {
+  } else if (listId === sellId) {
+    // Same agent for listing and selling: Listing agent gets everything in pool
     list = pool
     sell = 0
   } else {
+    // Different agents: split pool 50/50 (25% total each)
     list = pool / 2
     sell = pool / 2
   }
   
   return { brokerage, list, sell }
+})
+
+const isSameAgentLocal = computed(() => {
+  const listId = String(currentListingAgentId.value || '')
+  const sellId = String(selectedSellingAgent.value || '')
+  return listId === sellId && !!sellId
 })
 
 const saveChanges = async () => {
@@ -147,7 +187,25 @@ const saveChanges = async () => {
     }, 1000)
     
   } catch(e) {
-    errorMsg.value = 'Failed to update transaction.'
+    console.error('Update failed:', e)
+    errorMsg.value = e.data?.message || 'Failed to update transaction status. Ensure you are moving forward in the workflow.'
+    loading.value = false
+  }
+}
+
+const cancelTransaction = async () => {
+  if (!confirm('Are you sure you want to cancel this transaction? This action is permanent.')) return
+  
+  loading.value = true
+  try {
+    await store.updateTransaction(transactionId, { status: 'canceled' })
+    successMsg.value = 'Transaction successfully canceled'
+    setTimeout(() => {
+      router.push('/transactions')
+    }, 1000)
+  } catch (e) {
+    console.error('Cancel failed:', e)
+    errorMsg.value = e.data?.message || 'Failed to cancel transaction.'
     loading.value = false
   }
 }
@@ -172,6 +230,13 @@ const isStepActiveOrPast = (stepId) => {
 const isStepCurrent = (stepId) => {
   return selectedStage.value === stepId
 }
+
+const VALID_TRANSITIONS = {
+  agreement: 'earnest_money',
+  earnest_money: 'title_deed',
+  title_deed: 'completed',
+  completed: null
+}
 </script>
 
 <template>
@@ -191,8 +256,14 @@ const isStepCurrent = (stepId) => {
            <svg v-if="isStepActiveOrPast(step.id) && !isStepCurrent(step.id)" class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path></svg>
            <div v-else-if="isStepCurrent(step.id)" class="w-3 h-3 bg-white rounded-full"></div>
          </div>
-         <span :class="['text-[11px] font-black uppercase tracking-widest text-center', isStepCurrent(step.id) ? 'text-[#5B4EFF]' : (isStepActiveOrPast(step.id) ? 'text-emerald-500' : 'text-slate-400')]">{{ step.name }}</span>
+         <span :class="['text-[11px] font-black uppercase tracking-widest text-center', isStepCurrent(step.id) ? 'text-[#5B4EFF]' : (isStepActiveOrPast(step.id) ? 'text-emerald-500' : (step.id === VALID_TRANSITIONS[transaction?.status] ? 'text-indigo-400 animate-pulse' : 'text-slate-400'))]">{{ step.name }}</span>
        </div>
+    </div>
+
+    <!-- Error Toast -->
+    <div v-if="errorMsg" class="mb-8 bg-red-50 border border-red-200 text-red-700 px-5 py-4 rounded-xl flex items-center gap-3 shadow-sm animate-in fade-in slide-in-from-top-4">
+      <svg class="w-5 h-5 flex-shrink-0 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+      <span class="text-[14px] font-bold">{{ errorMsg }}</span>
     </div>
 
     <!-- Success Toast -->
@@ -204,17 +275,17 @@ const isStepCurrent = (stepId) => {
       <svg class="w-5 h-5 animate-spin text-emerald-600" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
     </div>
 
-    <div class="flex items-start gap-8">
+    <div class="flex flex-col lg:flex-row items-start gap-8">
       
       <!-- Left Column: Stage Selection & Forms -->
       <div class="flex-1">
          
          <div class="flex items-center gap-4 mb-6">
-           <button @click="router.push('/transactions')" class="w-10 h-10 bg-white border border-slate-200 rounded-full flex items-center justify-center hover:bg-slate-50 transition-colors shadow-sm cursor-pointer shrink-0">
-             <svg class="w-5 h-5 text-[#5B4EFF]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
-           </button>
-           <h2 class="text-[22px] font-black tracking-tight text-[#0B1A40]">{{ canManage ? 'Select Next Stage' : 'Transaction Status' }}</h2>
-         </div>
+            <button @click="router.push('/transactions')" class="w-8 h-8 sm:w-10 sm:h-10 bg-white border border-slate-200 rounded-full flex items-center justify-center hover:bg-slate-50 transition-colors shadow-sm cursor-pointer shrink-0">
+              <svg class="w-4 h-4 sm:w-5 sm:h-5 text-[#5B4EFF]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
+            </button>
+            <h2 class="text-[18px] sm:text-[22px] font-black tracking-tight text-[#0B1A40]">{{ canManage ? 'Select Next Stage' : 'Transaction Status' }}</h2>
+          </div>
 
          <!-- Cards Grid -->
          <div class="grid grid-cols-2 gap-4 mb-8">
@@ -286,14 +357,20 @@ const isStepCurrent = (stepId) => {
       </div>
 
       <!-- Right Column: Financial Breakdown -->
-      <div class="w-[380px] shrink-0 sticky top-10 flex flex-col gap-6">
+      <div class="w-full lg:w-[380px] shrink-0 lg:sticky lg:top-10 flex flex-col gap-6">
         
         <!-- Breakdown Card -->
         <div class="bg-white rounded-3xl border border-slate-100 p-8 shadow-[0_10px_40px_rgba(0,0,0,0.03)] border-t-4 border-t-[#5B4EFF] relative">
           
-          <div class="flex items-center gap-3 mb-6">
-            <svg class="w-6 h-6 text-[#5B4EFF]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z"></path></svg>
-            <h3 class="text-[20px] font-black text-[#0B1A40]">Financial Breakdown</h3>
+          <div class="flex items-center justify-between gap-3 mb-6">
+            <div class="flex items-center gap-3">
+               <svg class="w-6 h-6 text-[#5B4EFF]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z"></path></svg>
+               <h3 class="text-[20px] font-black text-[#0B1A40]">Financial Breakdown</h3>
+            </div>
+            <button v-if="canManage && transaction.status !== 'completed' && transaction.status !== 'canceled'" @click="cancelTransaction" class="text-[11px] font-black uppercase tracking-widest text-red-500 hover:text-red-700 transition-colors flex items-center gap-1">
+               <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+               Cancel
+            </button>
           </div>
 
           <div class="mb-4">
@@ -310,7 +387,7 @@ const isStepCurrent = (stepId) => {
              <div class="text-[10px] font-black text-[#0B1A40] uppercase tracking-widest mb-3">Estimated Split <span class="text-slate-400">{{ !selectedSellingAgent && isSellingAgentRequired ? '(PENDING AGENT)' : '' }}</span></div>
              <div class="w-full h-3 rounded-full flex overflow-hidden mb-6 bg-slate-100">
                 <div class="h-full bg-[#5B4EFF]" :style="{ width: '50%' }"></div>
-                <div v-if="currentListingAgentId === selectedSellingAgent || !selectedSellingAgent" class="h-full bg-emerald-500" :style="{ width: '50%' }"></div>
+                <div v-if="isSameAgentLocal || !selectedSellingAgent" class="h-full bg-emerald-500" :style="{ width: '50%' }"></div>
                 <template v-else>
                    <div class="h-full bg-emerald-500" :style="{ width: '25%' }"></div>
                    <div class="h-full bg-slate-300" :style="{ width: '25%' }"></div>
@@ -319,29 +396,43 @@ const isStepCurrent = (stepId) => {
 
              <!-- Breakdown Rows -->
              <div class="space-y-3 relative z-10">
-               <div class="flex justify-between items-center text-[13px]">
-                 <div class="flex items-center gap-2 font-medium text-slate-600">
-                   <div class="w-2.5 h-2.5 rounded-full bg-[#5B4EFF]"></div>
-                   Brokerage (50%)
-                 </div>
-                 <div class="font-black text-[#0B1A40]">${{ financialSplit.brokerage.toLocaleString('en-US') }}</div>
-               </div>
-               
-               <div class="flex justify-between items-center text-[13px]">
-                 <div class="flex items-center gap-2 font-medium text-slate-600">
-                   <div class="w-2.5 h-2.5 rounded-full bg-emerald-500"></div>
-                   Listing Agent ({{ currentListingAgentId === selectedSellingAgent || !selectedSellingAgent ? '50%' : '25%' }})
-                 </div>
-                 <div class="font-black text-[#0B1A40]">${{ financialSplit.list.toLocaleString('en-US') }}</div>
-               </div>
+                <div class="flex justify-between items-center text-[13px]">
+                  <div class="flex items-center gap-2 font-medium text-slate-600">
+                    <div class="w-2.5 h-2.5 rounded-full bg-[#5B4EFF]"></div>
+                    Brokerage (50%)
+                  </div>
+                  <div class="font-black text-[#0B1A40]">${{ financialSplit.brokerage.toLocaleString('en-US') }}</div>
+                </div>
+                
+                <!-- Agent Distribution Pool -->
+                <template v-if="isSameAgentLocal">
+                  <div class="flex justify-between items-center text-[13px]">
+                    <div class="flex items-center gap-2 font-medium text-slate-600">
+                      <div class="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-sm shadow-emerald-200"></div>
+                      Listing & Selling Agent (50%)
+                    </div>
+                    <div class="font-black text-[#0B1A40]">${{ financialSplit.list.toLocaleString('en-US') }}</div>
+                  </div>
+                </template>
+                <template v-else>
+                  <!-- Listing Agent -->
+                  <div class="flex justify-between items-center text-[13px]">
+                    <div class="flex items-center gap-2 font-medium text-slate-600">
+                      <div class="w-2.5 h-2.5 rounded-full bg-emerald-500"></div>
+                      Listing Agent ({{ !selectedSellingAgent ? '50%' : '25%' }})
+                    </div>
+                    <div class="font-black text-[#0B1A40]">${{ financialSplit.list.toLocaleString('en-US') }}</div>
+                  </div>
 
-               <div :class="['flex justify-between items-center text-[13px] pt-3 mt-3 border-t border-slate-100', (!selectedSellingAgent && isSellingAgentRequired) ? 'opacity-50 grayscale' : '']">
-                 <div class="flex items-center gap-2 font-medium text-slate-600">
-                   <div class="w-2.5 h-2.5 rounded-full bg-slate-300"></div>
-                   <span class="truncate max-w-[120px]">Selling Agent {{ !selectedSellingAgent ? '(Unassigned)' : (currentListingAgentId === selectedSellingAgent ? '' : '(25%)') }}</span>
-                 </div>
-                 <div class="font-black text-[#0B1A40]">${{ financialSplit.sell.toLocaleString('en-US') }}</div>
-               </div>
+                  <!-- Selling Agent (Show only if not same agent, unassigned or different) -->
+                  <div :class="['flex justify-between items-center text-[13px] pt-3 mt-3 border-t border-slate-100', (!selectedSellingAgent) ? 'opacity-50 grayscale pointer-events-none' : '']">
+                    <div class="flex items-center gap-2 font-medium text-slate-600">
+                      <div class="w-2.5 h-2.5 rounded-full bg-slate-300"></div>
+                      <span class="truncate max-w-[150px]">Selling Agent {{ !selectedSellingAgent ? '(Unassigned)' : '(25%)' }}</span>
+                    </div>
+                    <div class="font-black text-[#0B1A40]">${{ financialSplit.sell.toLocaleString('en-US') }}</div>
+                  </div>
+                </template>
              </div>
           </div>
         </div>
@@ -349,16 +440,20 @@ const isStepCurrent = (stepId) => {
         <!-- Sticky Footer Buttons -->
          <div class="flex flex-col gap-3">
           <div class="p-3 bg-white border border-slate-100 rounded-[20px] shadow-[0_10px_40px_rgba(0,0,0,0.04)] flex justify-between gap-3">
-             <button @click="router.push('/transactions')" class="flex-1 bg-white hover:bg-slate-50 border border-slate-200 border-dashed text-slate-500 text-[13px] font-bold rounded-xl py-3.5 transition-colors">
+             <button @click="router.push('/transactions')" class="flex-1 bg-white hover:bg-slate-50 border border-slate-200 border-dashed text-slate-500 text-[11px] sm:text-[13px] font-bold rounded-xl py-3 sm:py-3.5 transition-colors">
                Cancel
              </button>
-             <button v-if="canManage" @click="saveChanges" :disabled="!isValid || loading" :class="['flex-1 text-white text-[13px] font-bold rounded-xl py-3.5 flex items-center justify-center gap-2 transition-colors shadow-sm', isValid && !loading ? 'bg-[#5B4EFF] hover:bg-indigo-700' : 'bg-slate-300 cursor-not-allowed']">
+             <button v-if="canManage && transaction.status !== 'canceled'" @click="saveChanges" :disabled="!isValid || loading" :class="['flex-1 text-white text-[11px] sm:text-[13px] font-bold rounded-xl py-3 sm:py-3.5 flex items-center justify-center gap-2 transition-colors shadow-sm', isValid && !loading ? 'bg-[#5B4EFF] hover:bg-indigo-700' : 'bg-slate-300 cursor-not-allowed']">
                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"></path></svg>
-               Update Stage & Save
+               <span class="truncate">Update & Save</span>
              </button>
-             <div v-else class="flex-1 bg-slate-50 text-slate-400 text-[13px] font-bold rounded-xl py-3.5 flex items-center justify-center gap-2 border border-slate-200 border-dashed">
+             <div v-else-if="transaction.status === 'canceled'" class="flex-1 bg-red-50 text-red-500 text-[11px] sm:text-[13px] font-bold rounded-xl py-3 sm:py-3.5 flex items-center justify-center gap-2 border border-red-100 border-dashed">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                Canceled
+             </div>
+             <div v-else class="flex-1 bg-slate-50 text-slate-400 text-[11px] sm:text-[13px] font-bold rounded-xl py-3 sm:py-3.5 flex items-center justify-center gap-2 border border-slate-200 border-dashed">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
-                Read Only Access
+                Read Only
              </div>
           </div>
         </div>

@@ -10,10 +10,14 @@ export const useTransactionStore = defineStore('transactions', {
   actions: {
     async fetchTransactions() {
       const config = useRuntimeConfig()
+      const auth = useAuthStore()
       this.loading = true
       try {
-        // Backend'deki listeyi çekiyoruz
-        const data = await $fetch(`${config.public.apiBase}/transactions`)
+        const data = await $fetch(`${config.public.apiBase}/transactions`, {
+          headers: {
+            Authorization: `Bearer ${auth.token}`
+          }
+        })
         this.transactions = data as any[]
       } catch (error) {
         console.error('Hata:', error)
@@ -41,9 +45,13 @@ export const useTransactionStore = defineStore('transactions', {
     },
     async createTransaction(payload: any) {
       const config = useRuntimeConfig()
+      const auth = useAuthStore()
       try {
         await $fetch(`${config.public.apiBase}/transactions`, {
           method: 'POST',
+          headers: {
+            Authorization: `Bearer ${auth.token}`
+          },
           body: payload
         })
         await this.fetchTransactions()

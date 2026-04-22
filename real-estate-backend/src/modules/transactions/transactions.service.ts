@@ -4,12 +4,8 @@ import { Model } from 'mongoose';
 import { Transaction } from '../../schemas/transaction.schema';
 import { CommissionsService } from '../commissions/commissions.service';
 
-// Valid stage transitions — only these moves are allowed
-const VALID_TRANSITIONS: Record<string, string> = {
-  agreement: 'earnest_money',
-  earnest_money: 'title_deed',
-  title_deed: 'completed',
-};
+// Ordered sequence of transaction stages
+const STAGE_ORDER = ['agreement', 'earnest_money', 'title_deed', 'completed'];
 
 @Injectable()
 export class TransactionsService {
@@ -26,8 +22,8 @@ export class TransactionsService {
   async findAll() {
     return this.transactionModel
       .find()
-      .populate('listingAgentId', 'name')
-      .populate('sellingAgentId', 'name')
+      .populate('listingAgentId', 'name photo')
+      .populate('sellingAgentId', 'name photo')
       .exec();
   }
 
@@ -37,39 +33,51 @@ export class TransactionsService {
    * @param payload { status?, sellingAgentId? }
    * @param requesterId The _id of the authenticated user making the request
    */
-  async updateStatus(id: string, payload: any, requesterId?: string) {
+  async updateStatus(id: string, payload: any, requesterId?: string, isAdmin: boolean = false) {
     const transaction = await this.transactionModel.findById(id);
     if (!transaction) throw new NotFoundException('Transaction not found');
 
     // ── Ownership check ──────────────────────────────────────────────────────
+
     // Only the listing agent OR selling agent of this transaction may update it.
-    // Admins (passed as undefined requesterId) bypass this check.
-    if (requesterId) {
-      const listId = transaction.listingAgentId?.toString();
-      const sellId = transaction.sellingAgentId?.toString();
-      const isInvolved = listId === requesterId || sellId === requesterId;
+    // Admins bypass this check.
+    if (!isAdmin && requesterId) {
+      const listId = String(transaction.listingAgentId || '');
+      const sellId = String(transaction.sellingAgentId || '');
+      const reqId = String(requesterId);
+      
+      const isInvolved = listId === reqId || sellId === reqId;
+      
       if (!isInvolved) {
         throw new ForbiddenException(
-          'You are not authorized to update this transaction. Only the listing or selling agent may advance the stage.',
+          `You are not authorized to update this transaction. Requester: ${reqId}, ListingAgent: ${listId}, SellingAgent: ${sellId}`,
         );
       }
     }
 
     // ── Stage transition validation ───────────────────────────────────────────
-    if (payload.status) {
-      if (transaction.status === 'completed') {
-        throw new BadRequestException('Cannot advance a completed transaction.');
+    if (payload.status && payload.status !== transaction.status) {
+      if (transaction.status === 'completed' || transaction.status === 'canceled') {
+        throw new BadRequestException(`Cannot update a ${transaction.status} transaction.`);
       }
-      const allowedNext = VALID_TRANSITIONS[transaction.status];
-      if (payload.status !== allowedNext) {
-        throw new BadRequestException(
-          `Invalid stage transition: "${transaction.status}" → "${payload.status}". Expected next stage: "${allowedNext}".`,
-        );
+
+      // Allow canceling from any active stage
+      if (payload.status === 'canceled') {
+        transaction.status = 'canceled';
+      } else {
+        const currentIndex = STAGE_ORDER.indexOf(transaction.status);
+        const nextIndex = STAGE_ORDER.indexOf(payload.status);
+
+        if (nextIndex === -1 || nextIndex <= currentIndex) {
+          throw new BadRequestException(
+            `Invalid stage transition: "${transaction.status}" → "${payload.status}". You can only move forward in the sequence: ${STAGE_ORDER.join(' → ')}.`,
+          );
+        }
+        transaction.status = payload.status;
       }
-      transaction.status = payload.status;
     }
 
-    if (payload.sellingAgentId) {
+    if (payload.hasOwnProperty('sellingAgentId')) {
       transaction.sellingAgentId = payload.sellingAgentId;
     }
 
@@ -84,10 +92,5 @@ export class TransactionsService {
     }
 
     return transaction.save();
-  }
-
-  // Expose transition map for testing
-  static getValidTransitions() {
-    return VALID_TRANSITIONS;
   }
 }

@@ -22,12 +22,12 @@ const closeSidebar = () => { sidebarOpen.value = false }
   <div class="flex min-h-screen bg-[#fcfcfc] text-slate-800 font-sans">
 
     <!-- Mobile overlay backdrop -->
-    <div v-if="sidebarOpen" class="fixed inset-0 z-30 bg-slate-900/30 lg:hidden" @click="closeSidebar"></div>
+    <div v-if="sidebarOpen" class="fixed inset-0 z-30 bg-slate-900/30 xl:hidden" @click="closeSidebar"></div>
 
     <!-- Sidebar -->
     <aside :class="[
       'fixed h-full flex flex-col z-40 bg-[#fcfcfc] border-r border-slate-100/60 shadow-[2px_0_15px_rgba(0,0,0,0.04)] w-64 transition-transform duration-300',
-      sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
+      sidebarOpen ? 'translate-x-0' : '-translate-x-full xl:translate-x-0'
     ]">
       <!-- Logo -->
       <div class="px-5 py-8 flex items-center gap-3.5 mb-2">
@@ -60,15 +60,16 @@ const closeSidebar = () => { sidebarOpen.value = false }
 
       <!-- Footer - User Info & Sign Out -->
       <div class="px-4 py-4 mt-auto mb-4 space-y-1">
-        <div v-if="authStore.user" class="flex items-center gap-3 px-4 py-3 mb-1">
-          <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-[#5B4EFF] flex items-center justify-center text-white text-[12px] font-black shrink-0">
-            {{ authStore.user.name ? authStore.user.name.charAt(0).toUpperCase() : '?' }}
+        <NuxtLink v-if="authStore.user" :to="`/agents/${authStore.user._id}`" class="flex items-center gap-3 px-4 py-3 mb-1 hover:bg-slate-50 rounded-2xl transition-all cursor-pointer group">
+          <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-[#5B4EFF] flex items-center justify-center text-white text-[11px] font-black shrink-0 overflow-hidden group-hover:shadow-md transition-all">
+            <img v-if="authStore.user.photo" :src="authStore.user.photo" class="w-full h-full object-cover" />
+            <span v-else>{{ authStore.user.name ? authStore.user.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() : '?' }}</span>
           </div>
           <div class="flex-1 min-w-0">
-            <div class="text-[12px] font-bold text-slate-700 truncate">{{ authStore.user.name }}</div>
+            <div class="text-[12px] font-bold text-slate-700 truncate group-hover:text-indigo-700 transition-colors">{{ authStore.user.name }}</div>
             <div class="text-[10px] font-medium text-slate-400 truncate">{{ authStore.user.role === 'admin' ? 'Administrator' : 'Agent' }}</div>
           </div>
-        </div>
+        </NuxtLink>
 
         <button @click="handleSignOut" class="w-full flex items-center gap-3.5 px-4 py-3 text-[13.5px] font-medium rounded-2xl text-slate-600 hover:text-red-600 hover:bg-red-50 transition-all">
           <svg class="w-5 h-5 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
@@ -78,9 +79,9 @@ const closeSidebar = () => { sidebarOpen.value = false }
     </aside>
 
     <!-- Main content -->
-    <main class="flex-1 lg:ml-64 flex flex-col min-h-screen">
+    <main class="flex-1 xl:ml-64 flex flex-col min-h-screen">
       <!-- Mobile top bar -->
-      <div class="lg:hidden flex items-center gap-3 px-4 py-4 border-b border-slate-100 bg-[#fcfcfc] sticky top-0 z-20">
+      <div class="xl:hidden flex items-center gap-3 px-4 py-4 border-b border-slate-100 bg-[#fcfcfc] sticky top-0 z-20">
         <button @click="sidebarOpen = !sidebarOpen" class="w-9 h-9 rounded-xl border border-slate-200 flex items-center justify-center hover:bg-slate-50 transition-colors">
           <svg class="w-5 h-5 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
         </button>
@@ -93,7 +94,7 @@ const closeSidebar = () => { sidebarOpen.value = false }
       </div>
 
       <!-- Page content -->
-      <div class="p-4 sm:p-8 pt-4 flex-1">
+      <div class="px-2 sm:px-8 py-4 sm:py-8 flex-1">
         <slot />
       </div>
     </main>

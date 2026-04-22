@@ -21,6 +21,14 @@ const saveLoading = ref(false)
 const saveSuccess = ref(false)
 const photoFile = ref(null)
 const photoPreview = ref('')
+ 
+const isMobile = ref(false)
+if (process.client) {
+  isMobile.value = window.innerWidth < 640
+  window.addEventListener('resize', () => {
+    isMobile.value = window.innerWidth < 640
+  })
+}
 
 const onPhotoChange = (e) => {
   const file = e.target.files[0]
@@ -105,13 +113,17 @@ const stats = computed(() => {
 })
 
 const filteredTransactions = computed(() => {
-   if (filter.value === 'All') return myTransactions.value;
-   return myTransactions.value.filter(t => t._displayRole === filter.value);
+   const sorted = [...myTransactions.value].sort((a, b) => {
+     return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
+   });
+   if (filter.value === 'All') return sorted;
+   return sorted.filter(t => t._displayRole === filter.value);
 })
 
 const chartData = computed(() => {
    const months = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN'];
-   let data = { 'JAN': 0, 'FEB': 0, 'MAR': 0, 'APR': 0, 'MAY': 0, 'JUN': 0 };
+   let salesData = { 'JAN': 0, 'FEB': 0, 'MAR': 0, 'APR': 0, 'MAY': 0, 'JUN': 0 };
+   let listingsData = { 'JAN': 0, 'FEB': 0, 'MAR': 0, 'APR': 0, 'MAY': 0, 'JUN': 0 };
 
    myTransactions.value.forEach(t => {
      if (t.status === 'completed') {
@@ -123,33 +135,42 @@ const chartData = computed(() => {
        const mArr = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
        let mName = mArr[monthIndex];
        
-       if (data[mName] !== undefined) {
-         if (trendFilter.value === 'Sales' && isSelling) {
-            data[mName] += t._displayFee;
-         } else if (trendFilter.value === 'Listings' && isListing) {
-            data[mName] += t._displayFee;
-         }
+       if (salesData[mName] !== undefined && isSelling) {
+         salesData[mName] += t._displayFee;
+       }
+       if (listingsData[mName] !== undefined && isListing) {
+         listingsData[mName] += t._displayFee;
        }
      }
    });
 
-   let maxVal = 0;
-   const result = months.map(m => {
-     const val = data[m];
-     if (val > maxVal) maxVal = val;
-     return { label: m, value: val };
+   // Calculate global max across BOTH datasets for consistent scaling
+   let globalMax = 0;
+   months.forEach(m => {
+     if (salesData[m] > globalMax) globalMax = salesData[m];
+     if (listingsData[m] > globalMax) globalMax = listingsData[m];
    });
 
-   return { list: result, max: maxVal > 0 ? maxVal : 10000 };
+   // If the max is very low, set a minimum ceiling of $100k to maintain "step-by-step" feel for small amounts
+   const ceiling = Math.max(globalMax, 100000);
+
+   const currentData = trendFilter.value === 'Sales' ? salesData : listingsData;
+   const result = months.map(m => ({
+     label: m,
+     value: currentData[m]
+   }));
+
+   return { list: result, max: ceiling };
 })
 
 // Setup progress (no licenseNumber)
 const setupProgress = computed(() => {
   if (!agent.value) return 0
   let score = 0
-  if (agent.value.name) score += 25
-  if (agent.value.email) score += 25
+  if (agent.value.name) score += 20
+  if (agent.value.email) score += 20
   if (agent.value.phone) score += 20
+  if (agent.value.photo) score += 10
   if (agent.value.location) score += 10
   if (agent.value.bio) score += 10
   if (agent.value.instagram) score += 5
@@ -172,12 +193,19 @@ const missingFields = computed(() => {
   if (!agent.value) return []
   const missing = []
   if (!agent.value.phone) missing.push('Phone')
+  if (!agent.value.photo) missing.push('Photo')
   if (!agent.value.location) missing.push('Location')
   if (!agent.value.bio) missing.push('Bio')
   if (!agent.value.instagram) missing.push('Instagram')
   if (!agent.value.linkedin) missing.push('LinkedIn')
   return missing
 })
+
+const removePhoto = () => {
+  editData.value.photo = ''
+  photoFile.value = null
+  photoPreview.value = ''
+}
 
 const saveEdit = async () => {
   try {
@@ -194,6 +222,13 @@ const saveEdit = async () => {
       body: payload
     })
     agent.value = updated
+    // Sync with authStore if this is the current user
+    if (authStore.user?._id === agentId) {
+       authStore.user = { ...authStore.user, ...updated };
+       if (process.client) {
+          localStorage.setItem('auth_user', JSON.stringify(authStore.user));
+       }
+    }
     editMode.value = false
     photoFile.value = null
     photoPreview.value = ''
@@ -231,57 +266,58 @@ const formatShortMoney = (val) => {
     </div>
 
     <!-- Header -->
-    <div class="flex flex-col sm:flex-row sm:items-start justify-between mb-8 mt-2 gap-4">
-      <div class="flex items-start gap-4">
+    <div class="flex flex-row items-start justify-between mb-6 sm:mb-8 mt-2 gap-3 sm:gap-4">
+      <div class="flex items-start gap-3 sm:gap-4 min-w-0">
         <!-- Button back -->
-        <button @click="router.push('/agents')" class="w-10 h-10 bg-white border border-slate-200 rounded-full flex items-center justify-center hover:bg-slate-50 transition-colors shadow-sm shrink-0 mt-1">
-          <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
+        <button @click="router.push('/agents')" class="w-8 h-8 sm:w-10 sm:h-10 bg-white border border-slate-200 rounded-full flex items-center justify-center hover:bg-slate-50 transition-colors shadow-sm shrink-0 mt-0.5 sm:mt-1">
+          <svg class="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
         </button>
 
         <!-- Avatar -->
         <div class="relative shrink-0">
-          <div v-if="agent.photo" class="w-[70px] h-[70px] sm:w-[80px] sm:h-[80px] rounded-[22px] overflow-hidden border border-slate-100 shadow-md">
+          <div v-if="agent.photo" class="w-[50px] h-[50px] sm:w-[80px] sm:h-[80px] rounded-[16px] sm:rounded-[22px] overflow-hidden border border-slate-100 shadow-md">
             <img :src="agent.photo" :alt="agent.name" class="w-full h-full object-cover" />
           </div>
-          <div v-else class="w-[70px] h-[70px] sm:w-[80px] sm:h-[80px] bg-gradient-to-br from-indigo-500 to-[#5B4EFF] text-white rounded-[22px] flex items-center justify-center text-[28px] font-black shadow-md">
-            {{ agent.name ? agent.name.charAt(0).toUpperCase() : '?' }}
+          <div v-else class="w-[50px] h-[50px] sm:w-[80px] sm:h-[80px] bg-gradient-to-br from-indigo-500 to-[#5B4EFF] text-white rounded-[16px] sm:rounded-[22px] flex items-center justify-center text-[20px] sm:text-[28px] font-black shadow-md">
+            {{ agent.name ? agent.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() : '?' }}
           </div>
         </div>
 
-        <div class="min-w-0">
-          <div class="flex flex-wrap items-center gap-2 mb-1">
-            <h1 class="text-[22px] sm:text-[28px] font-black tracking-tight leading-tight">{{ agent.name }}</h1>
-            <!-- Social links -->
-            <a v-if="agent.instagram" :href="'https://instagram.com/' + agent.instagram" target="_blank"
-               class="w-7 h-7 rounded-lg bg-pink-50 flex items-center justify-center hover:bg-pink-100 transition-colors">
-              <svg class="w-3.5 h-3.5 text-pink-500" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/></svg>
-            </a>
-            <a v-if="agent.linkedin" :href="'https://linkedin.com/in/' + agent.linkedin" target="_blank"
-               class="w-7 h-7 rounded-lg bg-blue-50 flex items-center justify-center hover:bg-blue-100 transition-colors">
-              <svg class="w-3.5 h-3.5 text-blue-600" fill="currentColor" viewBox="0 0 24 24"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg>
-            </a>
+        <div class="min-w-0 pt-0.5 sm:pt-1">
+          <div class="flex flex-wrap items-center gap-1.5 sm:gap-2 mb-0.5 sm:mb-1">
+            <h1 class="text-[18px] sm:text-[28px] font-black tracking-tight leading-tight truncate">{{ agent.name }}</h1>
+            <div class="flex items-center gap-1.5">
+              <a v-if="agent.instagram" :href="'https://instagram.com/' + agent.instagram" target="_blank"
+                 class="w-6 h-6 sm:w-7 sm:h-7 rounded-lg bg-pink-50 flex items-center justify-center hover:bg-pink-100 transition-colors">
+                <svg class="w-3 h-3 sm:w-3.5 sm:h-3.5 text-pink-500" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/></svg>
+              </a>
+              <a v-if="agent.linkedin" :href="'https://linkedin.com/in/' + agent.linkedin" target="_blank"
+                 class="w-6 h-6 sm:w-7 sm:h-7 rounded-lg bg-blue-50 flex items-center justify-center hover:bg-blue-100 transition-colors">
+                <svg class="w-3 h-3 sm:w-3.5 sm:h-3.5 text-blue-600" fill="currentColor" viewBox="0 0 24 24"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg>
+              </a>
+            </div>
           </div>
-          <div class="flex flex-wrap items-center gap-1.5 text-[12px] text-slate-400 font-medium">
-            <span>{{ agent.email }}</span>
-            <span v-if="agent.phone">• {{ agent.phone }}</span>
-            <span v-if="agent.location">• {{ agent.location }}</span>
+          <div class="flex flex-wrap items-center gap-x-2 text-[11px] sm:text-[12px] text-slate-400 font-medium">
+            <span class="truncate max-w-[120px] sm:max-w-none">{{ agent.email }}</span>
+            <span v-if="agent.phone" class="hidden sm:inline">• {{ agent.phone }}</span>
+            <span v-if="agent.location" class="hidden sm:inline">• {{ agent.location }}</span>
           </div>
-          <p v-if="agent.bio" class="text-[12px] text-slate-500 font-medium mt-1.5 max-w-[500px] leading-relaxed">{{ agent.bio }}</p>
+          <p v-if="agent.bio" class="hidden sm:block text-[12px] text-slate-500 font-medium mt-1.5 max-w-[500px] leading-relaxed line-clamp-1 sm:line-clamp-none">{{ agent.bio }}</p>
         </div>
       </div>
 
       <!-- Buttons -->
-      <div class="flex items-center gap-3 shrink-0">
+      <div class="flex items-center gap-2 sm:gap-3 shrink-0 pt-0.5 sm:pt-1">
         <button v-if="!editMode && canEdit" @click="editMode = true; editData = { ...agent }"
-                class="flex items-center gap-2 bg-white border border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-50 font-bold text-[13px] px-4 py-2.5 rounded-2xl transition-colors shadow-sm">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
-          Edit Profile
+                class="flex items-center gap-2 bg-white border border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-50 font-black text-[11px] sm:text-[13px] px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl sm:rounded-2xl transition-colors shadow-sm whitespace-nowrap">
+          <svg class="w-3.5 h-3.5 sm:w-4 sm:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
+          <span>Edit Profile</span>
         </button>
       </div>
     </div>
 
-    <!-- Setup Progress Banner (shown if not 100%) -->
-    <div v-if="setupProgress < 100" class="mb-6 bg-white border border-slate-100 rounded-[1.5rem] p-5 shadow-sm">
+    <!-- Setup Progress Banner (shown if not 100% and user is viewing their OWN profile) -->
+    <div v-if="setupProgress < 100 && authStore.user?._id === agentId" class="mb-6 bg-white border border-slate-100 rounded-[1.5rem] p-5 shadow-sm">
       <div class="flex items-center justify-between mb-3">
         <div class="flex items-center gap-3">
           <div class="w-8 h-8 rounded-xl flex items-center justify-center" :style="{ backgroundColor: progressColor + '15' }">
@@ -306,37 +342,37 @@ const formatShortMoney = (val) => {
     </div>
 
     <!-- Stats Grid -->
-    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6 mb-8">
-      <div class="bg-white rounded-[2rem] p-7 shadow-sm relative overflow-hidden flex flex-col justify-between h-[150px] border border-slate-50">
+    <div class="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-6 mb-8">
+      <div class="bg-white rounded-[1.5rem] sm:rounded-[2rem] p-5 sm:p-7 shadow-sm relative overflow-hidden flex flex-col justify-between h-[130px] sm:h-[150px] border border-slate-50">
         <div class="absolute -top-10 -right-10 w-40 h-40 bg-emerald-50 rounded-full opacity-50 blur-2xl"></div>
         <div class="relative z-10">
-          <h3 class="text-[#0B1A40] text-[11px] font-black uppercase tracking-widest leading-none">Personal Earnings</h3>
-          <p class="text-slate-400 text-[11px] font-medium mt-1">YTD Commission</p>
+          <h3 class="text-[#0B1A40] text-[9px] sm:text-[11px] font-black uppercase tracking-widest leading-none">Earnings</h3>
+          <p class="text-slate-400 text-[9px] sm:text-[11px] font-medium mt-1">YTD Commission</p>
         </div>
-        <div class="relative z-10 text-[38px] font-black text-emerald-700 tracking-tight leading-none mt-4">
+        <div class="relative z-10 text-[24px] sm:text-[38px] font-black text-emerald-700 tracking-tight leading-none mt-2 sm:mt-4">
           {{ formatMoney(stats.pEarnings) }}
         </div>
       </div>
-
-      <div class="bg-white rounded-[2rem] p-7 shadow-sm relative overflow-hidden flex flex-col justify-between h-[150px] border border-slate-50">
+ 
+      <div class="bg-white rounded-[1.5rem] sm:rounded-[2rem] p-5 sm:p-7 shadow-sm relative overflow-hidden flex flex-col justify-between h-[130px] sm:h-[150px] border border-slate-50">
         <div class="absolute -top-10 -right-10 w-40 h-40 bg-indigo-50 rounded-full opacity-50 blur-2xl"></div>
         <div class="relative z-10">
-          <h3 class="text-[#0B1A40] text-[11px] font-black uppercase tracking-widest leading-none">Agency Contribution</h3>
-          <p class="text-slate-400 text-[11px] font-medium mt-1">Brokerage Share</p>
+          <h3 class="text-[#0B1A40] text-[9px] sm:text-[11px] font-black uppercase tracking-widest leading-none">Contribution</h3>
+          <p class="text-slate-400 text-[9px] sm:text-[11px] font-medium mt-1">Agency Share</p>
         </div>
-        <div class="relative z-10 text-[38px] font-black text-[#4A3AFF] tracking-tight leading-none mt-4">
+        <div class="relative z-10 text-[24px] sm:text-[38px] font-black text-[#4A3AFF] tracking-tight leading-none mt-2 sm:mt-4">
           {{ formatMoney(stats.aContribution) }}
         </div>
       </div>
-
-      <div class="bg-white rounded-[2rem] p-7 shadow-sm relative overflow-hidden flex flex-col justify-between h-[150px] border border-slate-50">
+ 
+      <div class="bg-white rounded-[1.5rem] sm:rounded-[2rem] p-5 sm:p-7 shadow-sm relative overflow-hidden flex flex-col justify-between h-[130px] sm:h-[150px] border border-slate-50">
         <div class="absolute -top-10 -right-10 w-40 h-40 bg-indigo-50 rounded-full opacity-50 blur-2xl pointer-events-none"></div>
         <div class="relative z-10">
-          <h3 class="text-[#0B1A40] text-[11px] font-black uppercase tracking-widest leading-none">Deals Closed</h3>
-          <p class="text-slate-400 text-[11px] font-medium mt-1">{{ stats.total }} total transactions</p>
+          <h3 class="text-[#0B1A40] text-[9px] sm:text-[11px] font-black uppercase tracking-widest leading-none">Deals</h3>
+          <p class="text-slate-400 text-[9px] sm:text-[11px] font-medium mt-1">{{ stats.total }} transactions</p>
         </div>
-        <div class="mt-4 relative z-10">
-          <div class="text-[38px] font-black text-indigo-700 tracking-tight leading-none">{{ stats.completed }}</div>
+        <div class="mt-2 sm:mt-4 relative z-10">
+          <div class="text-[24px] sm:text-[38px] font-black text-indigo-700 tracking-tight leading-none">{{ stats.completed }}</div>
         </div>
       </div>
     </div>
@@ -369,9 +405,14 @@ const formatShortMoney = (val) => {
               <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Profile Photo</label>
               <div class="flex items-center gap-4">
                 <!-- Preview -->
-                <div class="w-16 h-16 rounded-2xl overflow-hidden shrink-0 border-2 border-slate-100 shadow-sm bg-slate-50 flex items-center justify-center">
+                <div class="relative w-16 h-16 rounded-2xl overflow-hidden shrink-0 border-2 border-slate-100 shadow-sm bg-indigo-500 flex items-center justify-center text-white text-[18px] font-black group/photo">
                   <img v-if="photoPreview || editData.photo" :src="photoPreview || editData.photo" class="w-full h-full object-cover" />
-                  <svg v-else class="w-7 h-7 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
+                  <span v-else>{{ editData.name ? editData.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() : '?' }}</span>
+                  <!-- Remove button -->
+                  <button v-if="photoPreview || editData.photo" @click="removePhoto" 
+                          class="absolute inset-0 bg-red-500/80 text-white flex items-center justify-center opacity-0 group-hover/photo:opacity-100 transition-opacity">
+                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"></path></svg>
+                  </button>
                 </div>
                 <!-- File input styled -->
                 <label class="flex-1 cursor-pointer">
@@ -439,57 +480,57 @@ const formatShortMoney = (val) => {
     </Teleport>
 
     <!-- Bottom Area: Chart + Table -->
-    <div class="grid grid-cols-12 gap-6">
+    <div class="flex flex-col xl:grid xl:grid-cols-12 gap-6">
       
       <!-- Earnings Trend Chart (Col 3) -->
-      <div class="col-span-3 bg-white rounded-[2.5rem] py-6 px-7 shadow-sm flex flex-col border border-slate-50 h-fit self-start shrink-0">
+      <div class="xl:col-span-3 bg-white rounded-[1.5rem] sm:rounded-[2.5rem] py-6 px-7 shadow-sm flex flex-col border border-slate-50 h-auto xl:h-[460px] self-start shrink-0">
          <div class="flex items-center justify-between mb-5">
            <h3 class="text-[17px] font-black">Earnings Trend</h3>
          </div>
          
-         <div class="bg-slate-50/80 p-1.5 rounded-[14px] flex items-center mb-8 w-full">
+         <div class="bg-slate-50/80 p-1.5 rounded-[14px] flex items-center mb-6 w-full">
            <button @click="trendFilter = 'Sales'" :class="['flex-1 text-[11px] font-bold py-2 rounded-[10px] transition-all', trendFilter === 'Sales' ? 'bg-emerald-50 text-emerald-700 shadow-sm' : 'text-slate-500 hover:text-[#0B1A40]']">Sales</button>
            <button @click="trendFilter = 'Listings'" :class="['flex-1 text-[11px] font-bold py-2 rounded-[10px] transition-all', trendFilter === 'Listings' ? 'bg-indigo-50 text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-[#0B1A40]']">Listings</button>
          </div>
-
-         <div class="flex-1 flex items-end justify-between gap-2 mt-12 pb-4 h-[250px]">
-            <div v-for="item in chartData.list" :key="item.label" class="flex flex-col items-center gap-2">
-               <div :class="['text-[10px] font-black h-3', trendFilter === 'Listings' ? 'text-indigo-600' : 'text-emerald-600']">
+ 
+         <div class="flex-1 flex items-end justify-between gap-1 sm:gap-2 mt-4 sm:mt-12 pb-4 h-[180px] sm:h-[250px]">
+            <div v-for="item in chartData.list" :key="item.label" class="flex flex-col items-center gap-1.5 sm:gap-2">
+               <div :class="['text-[9px] sm:text-[10px] font-black h-3', trendFilter === 'Listings' ? 'text-indigo-600' : 'text-emerald-600']">
                  {{ formatShortMoney(item.value) }}
                </div>
-               <div v-if="trendFilter === 'Sales'" :class="['w-[32px] rounded-t-[4px] transition-all duration-500', item.value === chartData.max && item.value > 0 ? 'bg-emerald-700' : (item.value > 0 ? 'bg-emerald-500/60' : 'bg-slate-100')]" 
-                    :style="{ height: item.value > 0 ? Math.max((item.value / chartData.max) * 180, 20) + 'px' : '4px' }">
+               <div v-if="trendFilter === 'Sales'" :class="['w-[24px] sm:w-[32px] rounded-t-[4px] transition-all duration-500', item.value === chartData.max && item.value > 0 ? 'bg-emerald-700' : (item.value > 0 ? 'bg-emerald-500/60' : 'bg-slate-100')]" 
+                    :style="{ height: item.value > 0 ? Math.max((item.value / chartData.max) * (isMobile ? 120 : 180), 20) + 'px' : '4px' }">
                </div>
-               <div v-else :class="['w-[32px] rounded-t-[4px] transition-all duration-500', item.value === chartData.max && item.value > 0 ? 'bg-indigo-600' : (item.value > 0 ? 'bg-indigo-400/60' : 'bg-slate-100')]" 
-                    :style="{ height: item.value > 0 ? Math.max((item.value / chartData.max) * 180, 20) + 'px' : '4px' }">
+               <div v-else :class="['w-[24px] sm:w-[32px] rounded-t-[4px] transition-all duration-500', item.value === chartData.max && item.value > 0 ? 'bg-indigo-600' : (item.value > 0 ? 'bg-indigo-400/60' : 'bg-slate-100')]" 
+                    :style="{ height: item.value > 0 ? Math.max((item.value / chartData.max) * (isMobile ? 120 : 180), 20) + 'px' : '4px' }">
                </div>
-               <span :class="['text-[10px] font-black uppercase tracking-wider', item.value > 0 ? 'text-[#0B1A40]' : 'text-slate-400']">{{ item.label }}</span>
+               <span :class="['text-[9px] sm:text-[10px] font-black uppercase tracking-wider', item.value > 0 ? 'text-[#0B1A40]' : 'text-slate-400']">{{ item.label }}</span>
             </div>
          </div>
       </div>
 
       <!-- Historical Transactions Table (Col 9) -->
-      <div class="col-span-9 bg-white rounded-[2.5rem] p-8 shadow-sm flex flex-col border border-slate-50">
-        <div class="flex items-center justify-between mb-8">
+      <div class="xl:col-span-9 bg-white rounded-[1.5rem] sm:rounded-[2.5rem] p-5 sm:p-8 shadow-sm flex flex-col border border-slate-50">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
            <div>
              <h3 class="text-[18px] font-black text-[#0B1A40] pt-1.5">Historical Transactions</h3>
            </div>
            
-           <div class="bg-slate-50/80 flex items-center rounded-xl p-1.5 shadow-inner h-12 shrink-0">
-             <button @click="filter = 'All'" :class="['px-5 text-[12px] font-bold h-full rounded-[8px] transition-all', filter === 'All' ? 'bg-white text-[#0B1A40] shadow-sm' : 'text-slate-500 hover:text-[#0B1A40]']">All</button>
-             <button @click="filter = 'Selling Agent'" :class="['px-4 text-[12px] font-bold h-full rounded-[8px] transition-all', filter === 'Selling Agent' ? 'bg-white text-[#0B1A40] shadow-sm' : 'text-slate-500 hover:text-[#0B1A40]']">Selling</button>
-             <button @click="filter = 'Listing Agent'" :class="['px-4 text-[12px] font-bold h-full rounded-[8px] transition-all', filter === 'Listing Agent' ? 'bg-white text-[#0B1A40] shadow-sm' : 'text-slate-500 hover:text-[#0B1A40]']">Listing</button>
-             <button @click="filter = 'Both'" :class="['px-5 text-[12px] font-bold h-full rounded-[8px] transition-all', filter === 'Both' ? 'bg-white text-[#0B1A40] shadow-sm' : 'text-slate-500 hover:text-[#0B1A40]']">Both</button>
+           <div class="bg-slate-50/80 flex items-center rounded-xl p-1 shadow-inner h-11 sm:h-12 shrink-0 overflow-x-auto no-scrollbar">
+             <button @click="filter = 'All'" :class="['px-4 sm:px-5 text-[11px] sm:text-[12px] font-black h-full rounded-[8px] transition-all whitespace-nowrap', filter === 'All' ? 'bg-white text-[#0B1A40] shadow-sm' : 'text-slate-400 hover:text-[#0B1A40]']">All</button>
+             <button @click="filter = 'Selling Agent'" :class="['px-4 text-[11px] sm:text-[12px] font-black h-full rounded-[8px] transition-all whitespace-nowrap', filter === 'Selling Agent' ? 'bg-white text-[#0B1A40] shadow-sm' : 'text-slate-400 hover:text-[#0B1A40]']">Selling</button>
+             <button @click="filter = 'Listing Agent'" :class="['px-4 text-[11px] sm:text-[12px] font-black h-full rounded-[8px] transition-all whitespace-nowrap', filter === 'Listing Agent' ? 'bg-white text-[#0B1A40] shadow-sm' : 'text-slate-400 hover:text-[#0B1A40]']">Listing</button>
+             <button @click="filter = 'Both'" :class="['px-4 sm:px-5 text-[11px] sm:text-[12px] font-black h-full rounded-[8px] transition-all whitespace-nowrap', filter === 'Both' ? 'bg-white text-[#0B1A40] shadow-sm' : 'text-slate-400 hover:text-[#0B1A40]']">Both</button>
            </div>
         </div>
-
+ 
         <div class="w-full flex-1 flex flex-col">
-           <div class="border-y border-slate-100 py-3.5 grid grid-cols-12 gap-4 items-center">
-             <div class="col-span-5 text-[10px] font-black text-slate-400 uppercase tracking-widest border-r border-slate-100/40">Property Title</div>
-             <div class="col-span-2 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center border-r border-slate-100/40">Role</div>
-             <div class="col-span-2 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center border-r border-slate-100/40">Fee</div>
-             <div class="col-span-2 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center border-r border-slate-100/40">Status</div>
-             <div class="col-span-1 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Date</div>
+           <div class="border-y border-slate-100 py-3.5 grid grid-cols-12 gap-3 sm:gap-4 items-center">
+             <div class="col-span-7 sm:col-span-5 text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest sm:border-r border-slate-100/40">Property</div>
+             <div class="hidden sm:block col-span-2 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center border-r border-slate-100/40">Role</div>
+             <div class="col-span-3 sm:col-span-2 text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest text-center sm:border-r border-slate-100/40">Fee</div>
+             <div class="col-span-2 text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest text-center sm:border-r border-slate-100/40">Status</div>
+             <div class="hidden sm:block col-span-1 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Date</div>
            </div>
 
            <div class="divide-y divide-slate-100/60 max-h-[420px] overflow-y-auto pr-2 custom-scroll">
@@ -498,43 +539,41 @@ const formatShortMoney = (val) => {
                   <svg class="w-6 h-6 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"></path></svg>
                 </div>
                 <div class="text-slate-400 font-bold text-[14px]">No transactions found</div>
-                <div class="text-slate-400 font-medium text-[12px] mt-1">There are no transactions with this role yet.</div>
+        <div class="text-slate-400 font-medium text-[12px] mt-1">There are no transactions with this role yet.</div>
              </div>
              
-             <div v-for="t in filteredTransactions" :key="t._id" @click="router.push('/transactions?view=' + t._id)" class="py-4 grid grid-cols-12 gap-4 items-center group cursor-pointer hover:bg-slate-50/50 rounded-2xl transition-all -mx-3 px-3 relative active:scale-[0.99]">
+             <div v-for="t in filteredTransactions" :key="t._id" @click="router.push('/transactions?view=' + t._id)" class="py-4 grid grid-cols-12 gap-3 sm:gap-4 items-center group cursor-pointer hover:bg-slate-50/50 rounded-2xl transition-all -mx-2 sm:-mx-3 px-2 sm:px-3 relative active:scale-[0.99]">
                 <div class="absolute inset-y-2 -left-1 w-1 bg-indigo-500 rounded-r-lg opacity-0 group-hover:opacity-100 transition-opacity"></div>
                 
-                <div class="col-span-5 flex items-center gap-4">
-                  <div class="w-[46px] h-[46px] bg-[#16223B] rounded-[14px] overflow-hidden shrink-0 relative flex items-center justify-center shadow-sm">
-                       <svg v-if="t._displayRole === 'Selling Agent'" class="w-5 h-5 text-indigo-300" fill="currentColor" viewBox="0 0 24 24"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/></svg>
-                       <svg v-else-if="t._displayRole === 'Listing Agent'" class="w-5 h-5 text-emerald-300" fill="currentColor" viewBox="0 0 24 24"><path d="M17 11V3H7v4H3v14h8v-4h2v4h8V11h-4zM7 19H5v-2h2v2zm0-4H5v-2h2v2zm0-4H5V9h2v2zm4 4H9v-2h2v2zm0-4H9V9h2v2zm0-4H9V5h2v2zm4 8h-2v-2h2v2zm0-4h-2V9h2v2zm0-4h-2V5h2v2zm4 12h-2v-2h2v2zm0-4h-2v-2h2v2zm0-4h-2V9h2v2z"/></svg>
-                       <svg v-else class="w-5 h-5 text-slate-300" fill="currentColor" viewBox="0 0 24 24"><path d="M12 3L2 12h3v8h6v-6h2v6h6v-8h3L12 3zm0 2.828l7 6.172v10h-2v-4a2 2 0 00-2-2h-6a2 2 0 00-2 2v4H5v-10l7-6.172z"/></svg>
+                <div class="col-span-7 sm:col-span-5 flex items-center gap-3 sm:gap-4">
+                  <div class="hidden sm:flex w-[46px] h-[46px] bg-gradient-to-br from-indigo-50 to-slate-100 rounded-[14px] shrink-0 border border-slate-200/50 items-center justify-center shadow-sm relative overflow-hidden">
+                    <svg class="w-5 h-5 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path></svg>
                   </div>
-                  <div>
-                    <div class="text-[14px] font-black text-[#0B1A40] group-hover:text-[#4A3AFF] transition-colors leading-tight line-clamp-1">{{ t.title }}</div>
-                    <div class="text-[12px] font-medium text-slate-500 tracking-tight mt-1 truncate">{{ t._id.substring(0, 8) }}</div>
+                  <div class="min-w-0">
+                    <div class="text-[13px] sm:text-[14px] font-black text-[#0B1A40] group-hover:text-[#4A3AFF] transition-colors leading-tight line-clamp-1">{{ t.title }}</div>
+                    <div class="text-[10px] sm:text-[12px] font-medium text-slate-400 tracking-tight mt-1 truncate">ID: {{ t._id.substring(0, 8).toUpperCase() }}</div>
                   </div>
                 </div>
-
-                <div class="col-span-2 text-center">
+ 
+                <div class="hidden sm:block col-span-2 text-center">
                   <span class="text-[13px] font-bold text-slate-600">{{ t._displayRole }}</span>
                 </div>
-
-                <div class="col-span-2 text-center">
-                  <span class="text-[14px] font-black text-[#0B1A40]">{{ formatMoney(t._displayFee) }}</span>
+ 
+                <div class="col-span-3 sm:col-span-2 text-center">
+                  <span class="text-[13px] sm:text-[14px] font-black text-[#0B1A40]">{{ formatMoney(t._displayFee) }}</span>
                 </div>
-
+ 
                 <div class="col-span-2 text-center">
-                  <span :class="['inline-flex items-center justify-center px-3 py-1.5 text-[10px] font-black uppercase tracking-wider rounded-md', 
-                    t.status === 'completed' ? 'bg-emerald-50 text-emerald-700' : 'bg-[#4A3AFF]/10 text-[#4A3AFF]']">
-                    {{ t.status === 'completed' ? 'Completed' : 'In Progress' }}
+                  <span :class="['inline-flex items-center justify-center px-2 sm:px-3 py-1 sm:py-1.5 text-[8px] sm:text-[10px] font-black uppercase tracking-wider rounded-md whitespace-nowrap', 
+                    t.status === 'completed' ? 'bg-emerald-50 text-emerald-700' : (t.status === 'canceled' ? 'bg-red-50 text-red-500' : 'bg-[#4A3AFF]/10 text-[#4A3AFF]')]">
+                    {{ t.status === 'completed' ? 'Closed' : (t.status === 'canceled' ? 'Canceled' : 'Active') }}
                   </span>
                 </div>
-
-                <div class="col-span-1 text-center">
+ 
+                <div class="hidden sm:block col-span-1 text-center">
                   <span class="text-[13px] font-bold text-slate-500 whitespace-nowrap">{{ t._date }}</span>
                 </div>
-
+ 
              </div>
            </div>
         </div>
