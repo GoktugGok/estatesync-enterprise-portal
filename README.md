@@ -1,45 +1,125 @@
 # 🚀 EstateSync Enterprise Portal
-EstateSync is an enterprise-grade management platform designed to digitize real estate post-sale processes (escrow, title deeds, payment flows) and accurately automate complex commission distribution rules.
 
-This project is built using the **NestJS + Nuxt 3 + MongoDB Atlas** tech stack, adhering to modern software architecture principles and high user experience (UX) standards.
+EstateSync is a high-performance enterprise management platform designed to digitize real estate post-sale workflows (escrow, title deeds, payment flows) and automate complex commission distribution logic with absolute precision.
 
-## 🌟 Key Features
-- **Automated Commission Management**: Flawlessly calculates the 50% - 25% - 25% (Agency / Listing Agent / Selling Agent) sharing rules.
-- **Transaction Lifecycle (Stage Engine)**: Tracks the entire process from agreement to title deed using a linear state machine.
-- **Financial Transparency & Traceability**: Provides detailed financial breakdowns and audit logs for every transaction.
-- **Advanced Dashboard & Analytics**: Visualizes agent performance and company profitability with Apple-style minimalist charts.
-- **Role-Based Access Control**: Ensures a secure environment with the "Viewable by all, editable by responsible parties" philosophy.
+Built for scalability and transparency, the system ensures that every financial stakeholder—from the agency to the listing and selling agents—has a clear, auditable breakdown of their earnings.
 
-## 🏗️ Technical Architecture
-- **Backend**: NestJS (Modular Architecture), JWT Authentication, MongoDB (Mongoose), Jest (Unit Tests).
-- **Frontend**: Nuxt 3 (SSR/SPA), Pinia (State Management), Tailwind CSS, Headless UI.
-- **Database**: MongoDB Atlas (Cloud).
+---
 
-## 🚀 Live Demo Links
-*Note: The system is deployed for case evaluation purposes.*
+# 🌟 Key Features
 
-- **Frontend (Live)**: `[YOUR_VERCEL_OR_RENDER_LINK_HERE]`
-- **API (Live)**: `[YOUR_RENDER_OR_RAILWAY_LINK_HERE]`
+* **Automated Commission Engine**
+  Flawlessly calculates the 50% - 25% - 25% (Agency / Listing Agent / Selling Agent) sharing rules.
 
-## 💻 Local Installation Instructions
+* **Transaction Lifecycle (Stage Engine)**
+  Tracks the entire process from `Agreement` → `Earnest Money` → `Title Deed` → `Completed` using a linear state machine.
+
+* **Financial Transparency**
+  Provides real-time detailed earnings breakdowns for agency and agents, visualized in a premium interface.
+
+* **Advanced Dashboard & Analytics**
+  Clean admin panel with operational summaries, deal volume tracking, and financial reporting.
+
+* **Role-Based Access Control (RBAC)**
+  Secure "Viewable by all, editable by responsible parties" environment with Admin and Agent roles.
+
+---
+
+# 🏗️ Technical Architecture
+
+## Backend (NestJS)
+* **Framework**: NestJS (Modular Architecture)
+* **Language**: TypeScript
+* **Database**: MongoDB Atlas with Mongoose
+* **Auth**: JWT Authentication & Bcrypt hashing
+* **Testing**: Jest (Comprehensive unit tests for business logic)
+
+## Frontend (Nuxt 3)
+* **Framework**: Nuxt 3 (SSR/SPA Hybrid)
+* **State**: Pinia (Centralized transaction and auth state)
+* **Styling**: Tailwind CSS
+* **Design**: Custom modern components with smooth animations
+
+---
+
+# 🚀 Live Demo Links
+
+## Frontend
+[https://estatesync-enterprise-portal.vercel.app](https://estatesync-enterprise-portal.vercel.app)
+
+## Backend API
+[https://estatesync-enterprise-portal.up.railway.app](https://estatesync-enterprise-portal.up.railway.app)
+
+---
+
+# 🔐 Demo Credentials
+
+| Role | Email | Password |
+| :--- | :--- | :--- |
+| **Admin** | `admin@admin.com` | `admin123` |
+| **Agent** | `john@gmail.com` | `12345678` |
+
+---
+
+# 📌 Core Business Rules
+
+## 1. Commission Policy
+| Scenario | Agency | Listing Agent | Selling Agent |
+| :--- | :--- | :--- | :--- |
+| **Same Agent** | 50% | 50% | 0% |
+| **Different Agents** | 50% | 25% | 25% |
+
+## 2. Transaction Stages
+Transactions follow a strict forward-only sequence:
+`agreement` → `earnest_money` → `title_deed` → `completed`
+
+---
+
+# 📡 API Documentation
+
+Protected routes require JWT authentication via `Authorization: Bearer <token>`.
+
+| Method | Endpoint | Description | Auth |
+| :--- | :--- | :--- | :--- |
+| `POST` | `/auth/login` | User login (returns JWT) | Public |
+| `POST` | `/auth/register` | Register new user | Public |
+| `GET` | `/transactions` | List all transactions | JWT |
+| `POST` | `/transactions` | Create new transaction | JWT |
+| `PATCH` | `/transactions/:id/status` | Update stage / assign agent | **JWT + Owner** |
+| `GET` | `/users` | List all agents | Public |
+| `GET` | `/users/:id` | View agent performance | Public |
+
+---
+
+# 🌐 Frontend Pages
+
+| Page | Path |
+| :--- | :--- |
+| **Dashboard** | `/` |
+| **Transaction List** | `/transactions` |
+| **Create Deal** | `/transactions/create` |
+| **Manage Deal** | `/transactions/manage-:id` |
+| **Agent Directory** | `/agents` |
+| **Agent Profile** | `/agents/:id` |
+
+---
+
+# 💻 Local Installation
 
 ### 1. Backend Setup
 ```bash
 cd real-estate-backend
 npm install
 ```
-Create a `.env` file and define the following variables:
+Create `.env`:
 ```env
-MONGODB_URI=mongodb+srv://<user>:<password>@cluster.mongodb.net/estatesync
-JWT_SECRET=super_secret_antigravity_key
+MONGODB_URI=your_mongodb_atlas_uri
+JWT_SECRET=your_secret_key
+PORT=3000
 ```
-To run:
+Run:
 ```bash
 npm run start:dev
-```
-To run unit tests (19+ Tests):
-```bash
-npm run test
 ```
 
 ### 2. Frontend Setup
@@ -47,22 +127,33 @@ npm run test
 cd real-estate-frontend
 npm install
 ```
-Create a `.env` file:
+Create `.env`:
 ```env
 NUXT_PUBLIC_API_BASE=http://localhost:3000
 ```
-To run:
+Run:
 ```bash
 npm run dev
 ```
 
-## 📁 Project Documentation
-For technical details, architectural decisions, and design principles, please check:
-- **DESIGN.md**: Architectural decisions, data models, and authorization design.
-- **Unit Tests**: Found under `src/**/*.spec.ts` for commission and stage transition tests.
+---
 
-## 💡 Developer Note (On Security)
-This repository interacts with production APIs. Database connection strings and secret keys are never hardcoded; they are managed entirely via Environment Variables. The database used for the live demo is an isolated MongoDB Atlas cluster sanitized of personal data.
+# 🧪 Running Tests
+The core business logic (commissions and stage transitions) is heavily tested.
+```bash
+cd real-estate-backend
+npm run test
+```
+*Tests cover: Commission calculation edge cases, stage transition validity, and ownership-based authorization.*
 
 ---
-*Prepared by Göktuğ Gök as an Engineering Challenge.* 🚀🔥
+
+# 📁 Project Documentation
+* `DESIGN.md` — Deep dive into architectural decisions and data modeling.
+* `real-estate-backend/src/**/*.spec.ts` — Unit test implementations.
+
+---
+
+# 👨‍💻 Author
+Prepared by **Göktuğ Gök** as a Technical Case Study. 🚀
+
